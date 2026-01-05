@@ -1,7 +1,6 @@
 import streamlit as st
-import textwrap
 from src.data import load_sleep_csv
-from src.charts import calendar_heatmap, rhythm_chart, bedtime_vs_score, efficiency_funnel, centered_funnel
+from src.charts import calendar_heatmap, rhythm_chart, bedtime_vs_score
 from src.charts import funnel_trapezoid
 
 
@@ -291,8 +290,6 @@ row2_left, row2_right = st.columns(2, gap="large")
 
 with row1_left:
     st.markdown("**Efficiency funnel (last night)**")
-    #st.altair_chart(efficiency_funnel(last_night), use_container_width=True)
-    #st.altair_chart(centered_funnel(last_night), use_container_width=True)
     st.plotly_chart(funnel_trapezoid(last_night), use_container_width=True)
 
 
