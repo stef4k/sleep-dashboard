@@ -553,7 +553,7 @@ def plotly_parallel_coords(df: pd.DataFrame, n_nights: int = 4):
         height=520,
         margin=dict(l=95, r=25, t=85, b=25),
         title=dict(
-            text=f"Sleep composition & quality (parallel coordinates, last {n_nights} nights)",
+            text=f"Sleep composition & quality (last {n_nights} nights)",
             x=0.0,
             xanchor="left",
             y=0.98,
