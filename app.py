@@ -1,7 +1,8 @@
 import streamlit as st
 from src.data import load_sleep_csv
-from src.charts import calendar_heatmap, rhythm_chart, bedtime_vs_score
-from src.charts import funnel_trapezoid
+from src.charts import funnel_trapezoid, sleep_bar_last_7_days, sleep_target_band, plotly_parallel_coords
+import sys
+#sys.modules.pop("src.charts", None)
 
 
 # ----------------------------
@@ -283,7 +284,7 @@ st.markdown("<div style='height: 10px'></div>", unsafe_allow_html=True)
 
 
 st.markdown("<div style='height: 8px'></div>", unsafe_allow_html=True)
-st.subheader("Short-term (last 7–30 days)")
+st.subheader("Short-term (last 7 days)")
 
 row1_left, row1_right = st.columns(2, gap="large")
 row2_left, row2_right = st.columns(2, gap="large")
@@ -293,32 +294,17 @@ with row1_left:
     st.plotly_chart(funnel_trapezoid(last_night), use_container_width=True)
 
 
-
-
 with row1_right:
-    st.markdown("**Sleep score trend**")
-    # Plot 2: score trend (you need a function; if you don't have one yet, use bedtime_vs_score temporarily)
-    st.altair_chart(
-        bedtime_vs_score(df_recent),  # placeholder if you haven't written score_trend()
-        use_container_width=True
-    )
+    st.markdown("**Sleep timeline (last 7 days)**")
+    st.altair_chart(sleep_bar_last_7_days(df_filtered.tail(30)), use_container_width=True)
 
 with row2_left:
-    st.markdown("**Sleep rhythm (bed/wake)**")
-    # Plot 3: rhythm
-    st.altair_chart(
-        rhythm_chart(df_recent),
-        use_container_width=True
-    )
+    st.markdown("**Total sleep vs target (7.5h)**")
+    st.altair_chart(sleep_target_band(df_filtered, target_hours=7.5), use_container_width=True)
 
 with row2_right:
-    st.markdown("**Resting heart rate trend**")
-    # Plot 4: RHR trend (you likely need to implement this in src/charts.py)
-    # Temporary fallback: reuse bedtime_vs_score until rhr_trend exists
-    st.altair_chart(
-        bedtime_vs_score(df_recent),  # placeholder
-        use_container_width=True
-    )
+    #st.markdown("**Sleep composition & quality (last 4 nights)**")
+    st.plotly_chart(plotly_parallel_coords(df_filtered, n_nights=4), use_container_width=True)
 
 # # ----------------------------
 # # KPI row (optional)
