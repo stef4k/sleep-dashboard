@@ -2,6 +2,7 @@ import altair as alt
 import pandas as pd
 import plotly.graph_objects as go
 import math
+import numpy as np
 
 
 # Helper to format hours as "Xh YYm"
@@ -561,3 +562,649 @@ def plotly_parallel_coords(df: pd.DataFrame, n_nights: int = 4):
     )
 
     return fig
+
+
+def _filter_last_n_days(df: pd.DataFrame, n_days: int) -> pd.DataFrame:
+    d = df.copy()
+    d["date"] = pd.to_datetime(d["date"]).dt.date
+    if len(d) == 0:
+        return d
+    max_date = pd.to_datetime(d["date"]).max().date()
+    min_date = (pd.to_datetime(max_date) - pd.Timedelta(days=n_days - 1)).date()
+    return d[(d["date"] >= min_date) & (d["date"] <= max_date)].sort_values("date")
+
+def calendar_heatmap_month(df: pd.DataFrame, value_col: str = "minutes_asleep"):
+    if df is None or len(df) == 0:
+        return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
+
+    d = df.copy()
+
+    if "is_night_sleep" in d.columns:
+        d = d[d["is_night_sleep"] == True]
+    if len(d) == 0:
+        return alt.Chart(pd.DataFrame({"msg": ["No night sleep rows"]})).mark_text(size=16).encode(text="msg:N")
+
+    d["date"] = pd.to_datetime(d["date"], errors="coerce")
+    d = d.dropna(subset=["date"])
+
+    # Make sure the value column is numeric
+    d[value_col] = pd.to_numeric(d[value_col], errors="coerce").fillna(0)
+
+    d["date_day"] = d["date"].dt.floor("D")
+
+    daily = (
+        d.groupby("date_day", as_index=False)
+         .agg(total_min=(value_col, "sum"))
+         .rename(columns={"date_day": "day"})
+    )
+    if daily.empty:
+        return alt.Chart(pd.DataFrame({"msg": ["No daily data"]})).mark_text(size=16).encode(text="msg:N")
+
+    latest = daily["day"].max()
+    daily = daily[(daily["day"].dt.year == latest.year) & (daily["day"].dt.month == latest.month)].copy()
+    if daily.empty:
+        return alt.Chart(pd.DataFrame({"msg": ["No rows in latest month"]})).mark_text(size=16).encode(text="msg:N")
+
+    # Convert to hours
+    daily["sleep_h"] = daily["total_min"] / 60.0
+
+    # Clamp for a fixed scale (your spec)
+    daily["sleep_h_clamped"] = daily["sleep_h"].clip(lower=4.5, upper=9.0)
+
+    # Display hours as hours and minutes
+    daily["sleep_hm"] = daily["total_min"].apply(fmt_hm_from_minutes)
+
+
+    # Discrete bands (fixed thresholds)
+    def band(h):
+        if h < 6.0:
+            return "4.5–6"
+        elif h < 7.5:
+            return "6–7.5"
+        else:
+            return "7.5–9"
+
+    daily["band"] = daily["sleep_h_clamped"].apply(band)
+
+    dow_order = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+    daily["dow"] = daily["day"].dt.day_name()
+    daily["dom"] = daily["day"].dt.day.astype(int)
+
+    first = pd.Timestamp(latest.year, latest.month, 1)
+    first_monday_index = first.dayofweek  # Mon=0
+    daily["wom"] = ((daily["dom"] + first_monday_index - 1) // 7).astype(int)
+
+    # Tooltip formatting
+    daily["sleep_h_str"] = daily["sleep_h"].apply(lambda h: f"{h:.1f}h")
+    daily["sleep_h_clamped_str"] = daily["sleep_h_clamped"].apply(lambda h: f"{h:.1f}h")
+
+    title = f"Calendar heatmap ({latest.strftime('%B %Y')})"
+
+    # Green / Yellow / Red palette (fixed bins)
+    band_domain = ["4.5–6", "6–7.5", "7.5–9"]
+    band_range = ["#d73027", "#fee08b", "#1a9850"]  # red, yellow, green
+
+    rect = (
+        alt.Chart(daily)
+        .mark_rect(cornerRadius=6)
+        .encode(
+            x=alt.X("wom:O", title=None, axis=alt.Axis(labelAngle=0, ticks=False)),
+            y=alt.Y("dow:O", sort=dow_order, title=None),
+            color=alt.Color(
+                "sleep_h_clamped:Q",
+                title="Total sleep (hours)",
+                scale=alt.Scale(
+                    domain=[4.5, 7, 9.0],
+                    range=["#d73027", "#fee08b", "#1a9850"],
+                ),
+                legend=alt.Legend(
+                    values=[4.5, 6, 7.5, 9],
+                    labelExpr="datum.value + ' h'"
+                ),
+            ),
+            tooltip=[
+                alt.Tooltip("day:T", title="Date"),
+                alt.Tooltip("sleep_hm:N", title="Total sleep"),
+            ]
+        )
+        .properties(height=240, title=title)
+    )
+
+    text = (
+        alt.Chart(daily)
+        .mark_text(fontSize=12)
+        .encode(
+            x="wom:O",
+            y=alt.Y("dow:O", sort=dow_order),
+            text=alt.Text("dom:O"),
+            tooltip=[
+                alt.Tooltip("day:T", title="Date"),
+                alt.Tooltip("sleep_h_str:N", title="Sleep"),
+            ],
+        )
+    )
+
+    return (rect + text).configure_view(strokeWidth=0)
+
+
+def sleep_rhythm_last_30_days(df: pd.DataFrame):
+    if df is None or len(df) == 0:
+        return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
+
+    d = df.copy()
+    d["date"] = pd.to_datetime(d["date"], errors="coerce")
+    d = d.dropna(subset=["date"])
+
+    if "is_night_sleep" in d.columns:
+        d = d[d["is_night_sleep"] == True]
+
+    if len(d) == 0:
+        return alt.Chart(pd.DataFrame({"msg": ["No night sleep rows"]})).mark_text(size=16).encode(text="msg:N")
+
+    # Filter last 30 days based on available max date
+    max_day = d["date"].dt.floor("D").max()
+    min_day = max_day - pd.Timedelta(days=29)
+    d = d[(d["date"].dt.floor("D") >= min_day) & (d["date"].dt.floor("D") <= max_day)].copy()
+
+    # Ensure start/end datetime exist
+    if "start_time" in d.columns:
+        d["start_dt"] = pd.to_datetime(d["start_time"], errors="coerce")
+    else:
+        d["start_dt"] = pd.NaT
+
+    if "end_time" in d.columns:
+        d["end_dt"] = pd.to_datetime(d["end_time"], errors="coerce")
+    else:
+        d["end_dt"] = pd.NaT
+
+    d = d.dropna(subset=["start_dt", "end_dt"])
+    if len(d) == 0:
+        return alt.Chart(pd.DataFrame({"msg": ["No valid start/end times"]})).mark_text(size=16).encode(text="msg:N")
+
+    # Hours as floats (so minutes are preserved)
+    d["bed_h_raw"] = d["start_dt"].dt.hour + d["start_dt"].dt.minute / 60.0
+    d["wake_h_raw"] = d["end_dt"].dt.hour + d["end_dt"].dt.minute / 60.0
+
+    # We want a continuous window from 18:00 → 14:00 next day.
+    # So represent everything on [18, 38] where 14:00 becomes 38.
+    def wrap_to_night_window(h):
+        # Anything earlier than 18:00 belongs to the "next day" part of the window
+        return h + 24 if h < 18 else h
+
+    d["bed_h"] = d["bed_h_raw"].apply(wrap_to_night_window)
+    d["wake_h"] = d["wake_h_raw"].apply(wrap_to_night_window)
+
+    # Long format for Altair
+    long = pd.concat(
+        [
+            d[["date", "bed_h"]].rename(columns={"bed_h": "hour"}).assign(event="Bedtime"),
+            d[["date", "wake_h"]].rename(columns={"wake_h": "hour"}).assign(event="Wake-up"),
+        ],
+        ignore_index=True,
+    )
+
+    # Tooltip: human time (unwrap)
+    def hour_to_hm(v: float) -> str:
+        v = float(v) % 24
+        h = int(v)
+        m = int(round((v - h) * 60))
+        if m == 60:
+            h = (h + 1) % 24
+            m = 0
+        return f"{h:02d}:{m:02d}"
+
+    long["time_hm"] = long["hour"].apply(hour_to_hm)
+
+    # Axis from 18 → 38 (i.e., 14:00 next day)
+    tickvals = list(range(18, 39, 2))
+
+    y_axis = alt.Y(
+        "hour:Q",
+        title="Hour",
+        scale=alt.Scale(domain=[18, 38]),
+        axis=alt.Axis(
+            values=tickvals,
+            labelExpr="format(datum.value % 24, '02') + ':00'",
+        ),
+    )
+    x_axis = alt.X(
+        "date:T",
+        title=None,
+        axis=alt.Axis(
+            labelAngle=-30,
+            labelOverlap=False,
+            labelFlush=False,
+            tickCount=8,
+        ),
+    )
+
+    # Semantically chosen colors
+    color_scale = alt.Scale(
+        domain=["Bedtime", "Wake-up"],
+        range=["#4B2E83", "#F28E2B"],
+    )
+
+    # Dotted lines  for median bedtime and wakeuptime
+    med_bed = float(np.median(d["bed_h"]))
+    med_wake = float(np.median(d["wake_h"]))
+
+    med_df = pd.DataFrame(
+        {
+            "event": ["Bedtime", "Wake-up"],
+            "hour": [med_bed, med_wake],
+        }
+    )
+    med_df["time_hm"] = med_df["hour"].apply(hour_to_hm)
+    median_rules = (
+        alt.Chart(med_df)
+        .mark_rule(strokeDash=[6, 4], strokeWidth=2)
+        .encode(
+            y="hour:Q",
+            color=alt.Color("event:N", title=None, scale=color_scale),
+            tooltip=[
+                alt.Tooltip("event:N", title="Median"),
+                alt.Tooltip("time_hm:N", title="Time"),
+            ],
+        )
+    )
+
+    median_labels = (
+        alt.Chart(med_df)
+        .mark_text(align="left", dx=6, dy=-6)
+        .encode(
+            y="hour:Q",
+            text=alt.Text("time_hm:N"),
+            color=alt.Color("event:N", title=None, scale=color_scale),
+        )
+    )
+
+
+    base = alt.Chart(long).encode(
+        x=x_axis,
+        y=y_axis,
+        color=alt.Color("event:N", title=None, scale=color_scale),
+        tooltip=[
+            alt.Tooltip("date:T", title="Date"),
+            alt.Tooltip("event:N", title="Event"),
+            alt.Tooltip("time_hm:N", title="Time"),
+        ],
+    )
+
+    chart = (base.mark_line() + base.mark_circle(size=60) + median_rules + median_labels).properties(
+        height=260, title="Sleep rhythm (last 30 days, median shown as dotted lines)"
+    ).configure_view(strokeWidth=0)
+    return chart
+
+
+
+def start_time_vs_efficiency(df: pd.DataFrame):
+    """
+    Scatter: bedtime (wrapped) vs efficiency, last 30 days.
+    Color by score for extra context.
+    """
+    if df is None or len(df) == 0:
+        return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
+
+    d = _filter_last_n_days(df, 30).copy()
+    if "is_night_sleep" in d.columns:
+        d = d[d["is_night_sleep"] == True]
+    if len(d) == 0:
+        return alt.Chart(pd.DataFrame({"msg": ["No night sleep rows"]})).mark_text(size=16).encode(text="msg:N")
+
+    d["date"] = pd.to_datetime(d["date"])
+    d["bed_h"] = d["start_hour"].apply(lambda h: h if h >= 21 else h + 24)
+
+
+    tickvals = list(range(21, 31))  # 21 → 30
+
+    x_axis = alt.X(
+        "bed_h:Q",
+        title="Bedtime",
+        scale=alt.Scale(domain=[21, 30]),
+        axis=alt.Axis(
+            values=tickvals,
+            labelExpr="format(datum.value % 24, '02') + ':00'",
+        ),
+    )
+
+    pts = (
+        alt.Chart(d)
+        .mark_circle(size=70, opacity=0.85)
+        .encode(
+            x=x_axis,
+            y=alt.Y("efficiency:Q", title="Efficiency", scale=alt.Scale(domain=[0.6, 1.0])),
+            color=alt.Color("overall_score:Q", title="Score"),
+            tooltip=[
+                alt.Tooltip("date:T", title="Date"),
+                alt.Tooltip("start_time:T", title="Start"),
+                alt.Tooltip("efficiency:Q", title="Efficiency", format=".2f"),
+                alt.Tooltip("overall_score:Q", title="Score"),
+            ],
+        )
+    )
+
+    trend = (
+        alt.Chart(d)
+        .transform_loess("bed_h", "efficiency", bandwidth=0.6)
+        .mark_line()
+        .encode(
+            x="bed_h:Q",
+            y="efficiency:Q",
+        )
+    )
+
+    return (pts + trend).properties(height=260, title="Bedtime vs efficiency (last 30 days)").configure_view(strokeWidth=0)
+
+
+def deep_pct_vs_bedtime(df: pd.DataFrame):
+    """
+    Scatter: bedtime (wrapped) vs deep sleep percentage (night), last 30 days.
+    """
+    if df is None or len(df) == 0:
+        return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
+
+    d = _filter_last_n_days(df, 30).copy()
+    if "is_night_sleep" in d.columns:
+        d = d[d["is_night_sleep"] == True]
+    if len(d) == 0:
+        return alt.Chart(pd.DataFrame({"msg": ["No night sleep rows"]})).mark_text(size=16).encode(text="msg:N")
+
+    d["date"] = pd.to_datetime(d["date"])
+    d["bed_h"] = d["start_hour"].apply(lambda h: h if h >= 12 else h + 24)
+    d["deep_pct_100"] = (d["deep_pct"] * 100).astype(float)
+
+    
+    tickvals = list(range(21, 31))  # 21 → 30
+
+    x_axis = alt.X(
+        "bed_h:Q",
+        title="Bedtime",
+        scale=alt.Scale(domain=[21, 30]),
+        axis=alt.Axis(
+            values=tickvals,
+            labelExpr="format(datum.value % 24, '02') + ':00'",
+        ),
+    )
+
+    pts = (
+        alt.Chart(d)
+        .mark_circle(size=70, opacity=0.85)
+        .encode(
+            x=x_axis,
+            y=alt.Y("deep_pct_100:Q", title="Deep sleep (%)"),
+            color=alt.Color("overall_score:Q", title="Score"),
+            tooltip=[
+                alt.Tooltip("date:T", title="Date"),
+                alt.Tooltip("start_time:T", title="Start"),
+                alt.Tooltip("deep_pct_100:Q", title="Deep %", format=".1f"),
+                alt.Tooltip("deep_minutes:Q", title="Deep (min)"),
+                alt.Tooltip("overall_score:Q", title="Score"),
+            ],
+        )
+    )
+
+    trend = (
+        alt.Chart(d)
+        .transform_loess("bed_h", "deep_pct_100", bandwidth=0.6)
+        .mark_line()
+        .encode(
+            x="bed_h:Q",
+            y="deep_pct_100:Q",
+        )
+    )
+
+    return (pts + trend).properties(height=260, title="Deep % vs bedtime (last 30 days)").configure_view(strokeWidth=0)
+
+
+def _last_n_days_night(df: pd.DataFrame, n_days: int = 30) -> pd.DataFrame:
+    """Filter to night sleeps and last n days by date."""
+    d = df.copy()
+    d["date"] = pd.to_datetime(d["date"], errors="coerce")
+    d = d.dropna(subset=["date"])
+
+    if "is_night_sleep" in d.columns:
+        d = d[d["is_night_sleep"] == True]
+
+    if d.empty:
+        return d
+
+    max_day = d["date"].dt.floor("D").max()
+    min_day = max_day - pd.Timedelta(days=n_days - 1)
+    d = d[(d["date"].dt.floor("D") >= min_day) & (d["date"].dt.floor("D") <= max_day)].copy()
+    d = d.sort_values("date")
+    return d
+
+
+def rhr_over_time_weekly(df: pd.DataFrame, months: int = 3):
+    d = df.copy()
+    d["date"] = pd.to_datetime(d["date"], errors="coerce")
+    d = d.dropna(subset=["date"])
+
+    if "is_night_sleep" in d.columns:
+        d = d[d["is_night_sleep"] == True]
+
+    if d.empty:
+        return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
+
+    # last N months based on max date in data (not "today")
+    max_day = d["date"].dt.floor("D").max()
+    min_day = max_day - pd.DateOffset(months=months)
+    d = d[d["date"] >= min_day].copy()
+
+    # Week start = Monday (stable + intuitive)
+    day = d["date"].dt.floor("D")
+    d["week_start"] = day - pd.to_timedelta(day.dt.weekday, unit="D")
+
+    weekly = (
+        d.groupby("week_start", as_index=False)
+         .agg(
+            rhr=("resting_heart_rate", "mean"),
+            score=("overall_score", "mean"),
+            nights=("week_start", "size"),
+         )
+         .sort_values("week_start")
+    )
+
+    # If resting_heart_rate is missing in your data, fail gracefully
+    weekly = weekly.dropna(subset=["rhr"])
+    if weekly.empty:
+        return alt.Chart(pd.DataFrame({"msg": ["No RHR values available"]})).mark_text(size=16).encode(text="msg:N")
+
+    base = alt.Chart(weekly).encode(
+        x=alt.X(
+            "week_start:T",
+            title=None,
+            axis=alt.Axis(labelAngle=-30, tickCount=8),
+        ),
+        y=alt.Y("rhr:Q", title="Resting heart rate (bpm)"),
+        tooltip=[
+            alt.Tooltip("week_start:T", title="Week of"),
+            alt.Tooltip("rhr:Q", title="Avg RHR", format=".1f"),
+            alt.Tooltip("score:Q", title="Avg score", format=".0f"),
+            alt.Tooltip("nights:Q", title="# nights"),
+        ],
+    )
+
+    line = base.mark_line()
+    pts = base.mark_circle(size=60)
+
+    return (line + pts).properties(
+        height=240,
+        title=alt.TitleParams(
+            text=f"Resting heart rate (weekly avg, last {months} months)",
+            anchor="start",
+            fontSize=14,
+            dy=0,
+        ),
+        padding={"left": 10, "right": 10, "top": 35, "bottom": 45},  # <- THIS fixes clipping
+    ).configure_view(strokeWidth=0)
+
+
+def rhr_vs_score(df: pd.DataFrame, n_days: int = 90):
+    d = _last_n_days_night(df, n_days)
+    if d.empty:
+        return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
+
+    # Keep needed cols + drop missing
+    d = d.dropna(subset=["resting_heart_rate", "overall_score"])
+
+    if d.empty:
+        return alt.Chart(pd.DataFrame({"msg": ["No valid rows"]})).mark_text(size=16).encode(text="msg:N")
+
+    pts = (
+        alt.Chart(d)
+        .mark_circle(size=70, opacity=0.85)
+        .encode(
+            x=alt.X(
+                "overall_score:Q",
+                title="Sleep score",
+                scale=alt.Scale(domain=[40, 100]),
+            ),
+            y=alt.Y(
+                "resting_heart_rate:Q",
+                title="RHR (bpm)",
+                scale=alt.Scale(domain=[30, 70]),
+            ),
+            tooltip=[
+                alt.Tooltip("date:T", title="Date"),
+                alt.Tooltip("overall_score:Q", title="Score", format=".0f"),
+                alt.Tooltip("resting_heart_rate:Q", title="RHR (bpm)", format=".0f"),
+            ],
+        )
+    )
+
+    trend = (
+        alt.Chart(d)
+        .transform_loess("overall_score", "resting_heart_rate", bandwidth=0.7)
+        .mark_line()
+        .encode(
+            x=alt.X("overall_score:Q", scale=alt.Scale(domain=[40, 100])),
+            y=alt.Y("resting_heart_rate:Q", scale=alt.Scale(domain=[30, 70])),
+        )
+    )
+
+    return (pts + trend).properties(
+        height=240,
+        title=f"RHR vs sleep score (last {n_days} days)",
+        padding={"bottom": 40, "left": 10, "right": 10, "top": 35},
+    ).configure_view(strokeWidth=0)
+
+
+def bad_sleep_pareto(df: pd.DataFrame, n_days: int = 30, score_max: float = 75.0):
+    """
+    Pareto chart over rule-based 'reason flags' for bad nights (score <= score_max).
+    Counts can exceed #nights because one night can trigger multiple reasons.
+    """
+    d = _last_n_days_night(df, n_days)
+    if d.empty:
+        return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
+
+    # Ensure datetime
+    d["start_time"] = pd.to_datetime(d["start_time"], errors="coerce")
+    d = d.dropna(subset=["start_time", "overall_score"])
+
+    # Aggregate per day (safer)
+    daily = (
+        d.assign(day=d["date"].dt.floor("D"))
+        .groupby("day", as_index=False)
+        .agg(
+            start_time=("start_time", "min"),
+            minutes_asleep=("minutes_asleep", "sum"),
+            minutes_awake=("minutes_awake", "sum"),
+            duration_min=("duration_min", "sum"),
+            efficiency=("efficiency", "mean"),
+            deep_pct=("deep_pct", "mean"),
+            score=("overall_score", "mean"),
+            rhr=("resting_heart_rate", "mean"),
+        )
+        .sort_values("day")
+    )
+
+    # Thresholds based on the 75th percentile over the period
+    rhr_thr = float(daily["rhr"].quantile(0.75)) if daily["rhr"].notna().any() else np.nan
+    awake_thr = float(daily["minutes_awake"].quantile(0.75)) if daily["minutes_awake"].notna().any() else np.nan
+
+    # Bedtime in wrapped hours (night window), for "late bedtime"
+    start_hour = daily["start_time"].dt.hour + daily["start_time"].dt.minute / 60.0
+    bedtime_wrapped = start_hour.where(start_hour >= 12, start_hour + 24)  # 01:00 -> 25, 03:00 -> 27
+
+    # Bad nights filter
+    bad = daily[daily["score"] <= score_max].copy()
+    if bad.empty:
+        return alt.Chart(pd.DataFrame({"msg": [f"No nights with score ≤ {score_max}"]})).mark_text(size=16).encode(text="msg:N")
+
+    # Recompute wrapped bedtime for bad subset
+    start_hour_bad = bad["start_time"].dt.hour + bad["start_time"].dt.minute / 60.0
+    bad["bed_wrapped"] = start_hour_bad.where(start_hour_bad >= 12, start_hour_bad + 24)
+
+    bad["sleep_h"] = bad["minutes_asleep"] / 60.0
+    bad["awake_pct"] = bad["minutes_awake"] / bad["duration_min"].replace(0, np.nan)
+
+    # Reason flags (simple + interpretable)
+    flags = pd.DataFrame({
+        "Late bedtime (≥ 02:00)": bad["bed_wrapped"] >= 26.0,              # 2am+
+        "Short sleep (< 7h)": bad["sleep_h"] < 7.0,
+        "Low efficiency (< 0.85)": bad["efficiency"] < 0.85,
+        "Woke up a lot (awake high)": (bad["minutes_awake"] >= awake_thr) | (bad["awake_pct"] >= 0.15),
+        "High RHR (relative)": bad["rhr"] >= rhr_thr if not np.isnan(rhr_thr) else False,
+        "Low deep sleep (deep% < 12%)": bad["deep_pct"] < 0.12 if "deep_pct" in bad.columns else False,
+    }, index=bad.index)
+    
+    # Build long list of triggered reasons
+    long = []
+    for idx in flags.index:
+        triggered = [c for c in flags.columns if bool(flags.loc[idx, c])]
+        if not triggered:
+            triggered = ["Other / unclear"]
+        for reason in triggered:
+            long.append(reason)
+
+    counts = pd.Series(long).value_counts().reset_index()
+    counts.columns = ["reason", "count"]
+    counts = counts.sort_values("count", ascending=False).reset_index(drop=True)
+    counts["cum_count"] = counts["count"].cumsum()
+    counts["cum_pct"] = counts["cum_count"] / counts["count"].sum()
+
+    # Pareto: bars (count) + line (cumulative %)
+    bars = (
+        alt.Chart(counts)
+        .mark_bar()
+        .encode(
+            x=alt.X("reason:N", sort="-y", title=None, axis=alt.Axis(labelAngle=0, labelOverlap=False,
+                                                        labelLimit=1000, labelPadding=10, ticks=True)),
+            y=alt.Y("count:Q", title="Reason count"),
+            tooltip=[
+                alt.Tooltip("reason:N", title="Reason"),
+                alt.Tooltip("count:Q", title="Count"),
+                alt.Tooltip("cum_pct:Q", title="Cumulative", format=".0%"),
+            ],
+        )
+    )
+
+    line = (
+        alt.Chart(counts)
+        .mark_line(point=True)
+        .encode(
+            x=alt.X("reason:N", sort="-y", title=None),
+            y=alt.Y(
+                "cum_pct:Q",
+                title="Cumulative % of triggered signals",
+                axis=alt.Axis(format="%", orient="right"),
+                scale=alt.Scale(domain=[0, 1]),
+            ),
+            tooltip=[
+                alt.Tooltip("reason:N", title="Reason"),
+                alt.Tooltip("cum_pct:Q", title="Cumulative", format=".0%"),
+            ],
+        )
+    )
+
+    return alt.layer(bars, line).resolve_scale(y="independent").properties(
+        height=260,
+        title=alt.TitleParams(
+            text=f"Bad sleep signals (Pareto of triggered signals, score ≤ {score_max}, last {n_days} days)",
+            anchor="start",
+            fontSize=14,
+        ),
+        padding={"top": 35, "bottom": 70, "left": 10, "right": 55},
+    ).configure_view(strokeWidth=0)

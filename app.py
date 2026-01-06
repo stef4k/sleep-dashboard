@@ -1,13 +1,24 @@
 import streamlit as st
 from src.data import load_sleep_csv
 from src.charts import funnel_trapezoid, sleep_bar_last_7_days, sleep_target_band, plotly_parallel_coords
+from src.charts import (
+    funnel_trapezoid,
+    sleep_bar_last_7_days,
+    sleep_target_band,
+    plotly_parallel_coords,
+    calendar_heatmap_month,
+    sleep_rhythm_last_30_days,
+    start_time_vs_efficiency,
+    deep_pct_vs_bedtime,
+)
+from src.charts import rhr_over_time_weekly, rhr_vs_score, bad_sleep_pareto
+
+
 import sys
 #sys.modules.pop("src.charts", None)
 
 
-# ----------------------------
 # Page config + global styles
-# ----------------------------
 st.set_page_config(page_title="Sleep Compass", layout="wide")
 
 st.markdown(
@@ -282,15 +293,15 @@ with right:
 
 st.markdown("<div style='height: 10px'></div>", unsafe_allow_html=True)
 
-
+# Short term section
 st.markdown("<div style='height: 8px'></div>", unsafe_allow_html=True)
-st.subheader("Short-term (last 7 days)")
+st.subheader("Short-term")
 
 row1_left, row1_right = st.columns(2, gap="large")
 row2_left, row2_right = st.columns(2, gap="large")
 
 with row1_left:
-    st.markdown("**Efficiency funnel (last night)**")
+    #st.markdown("**Efficiency funnel (last night)**")
     st.plotly_chart(funnel_trapezoid(last_night), use_container_width=True)
 
 
@@ -306,30 +317,40 @@ with row2_right:
     #st.markdown("**Sleep composition & quality (last 4 nights)**")
     st.plotly_chart(plotly_parallel_coords(df_filtered, n_nights=4), use_container_width=True)
 
-# # ----------------------------
-# # KPI row (optional)
-# # ----------------------------
-# st.subheader("Quick stats")
-# k1, k2, k3, k4, k5 = st.columns(5)
-# k1.metric("Avg score", f"{df_recent['overall_score'].mean():.1f}" if len(df_recent) else "—")
-# k2.metric("Avg sleep (h)", f"{df_recent['sleep_hours'].mean():.2f}" if len(df_recent) else "—")
-# k3.metric("Avg efficiency", f"{df_recent['efficiency'].mean():.2f}" if len(df_recent) else "—")
-# k4.metric("Avg deep %", f"{(df_recent['deep_pct'].mean()*100):.1f}%" if len(df_recent) else "—")
-# k5.metric("Avg RHR", f"{df_recent['resting_heart_rate'].mean():.1f}" if len(df_recent) else "—")
+# Mid term section
+st.markdown("<div style='height: 8px'></div>", unsafe_allow_html=True)
+st.subheader("Mid-term")
 
-# # ----------------------------
-# # Charts
-# # ----------------------------
-# st.subheader("Overview")
-# st.altair_chart(calendar_heatmap(df_recent, value_col=metric), use_container_width=True)
+m1_left, m1_right = st.columns(2, gap="large")
+m2_left, m2_right = st.columns(2, gap="large")
 
-# c1, c2 = st.columns(2)
-# with c1:
-#     st.subheader("Sleep rhythm (bed/wake)")
-#     st.altair_chart(rhythm_chart(df_recent), use_container_width=True)
-# with c2:
-#     st.subheader("Bedtime vs score")
-#     st.altair_chart(bedtime_vs_score(df_recent), use_container_width=True)
+with m1_left:
+    #st.markdown("**Calendar heatmap (total sleep per day)**")
+    st.altair_chart(calendar_heatmap_month(df_filtered, value_col="minutes_asleep"), use_container_width=True)
 
-# with st.expander("Data preview"):
-#     st.dataframe(df_recent.tail(50), use_container_width=True)
+with m1_right:
+    #st.markdown("**Sleep rhythm (bedtime & wake-up)**")
+    st.altair_chart(sleep_rhythm_last_30_days(df_filtered), use_container_width=True)
+
+with m2_left:
+    #st.markdown("**Bedtime vs efficiency**")
+    st.altair_chart(start_time_vs_efficiency(df_filtered), use_container_width=True)
+
+with m2_right:
+    #st.markdown("**Deep sleep % vs bedtime**")
+    st.altair_chart(deep_pct_vs_bedtime(df_filtered), use_container_width=True)
+
+
+# Long term sections
+st.markdown("<div style='height: 10px'></div>", unsafe_allow_html=True)
+
+left, right = st.columns(2, gap="large")
+
+with left:
+    st.markdown("### Health")
+    st.altair_chart(rhr_over_time_weekly(df_filtered, months=3), use_container_width=True)
+    st.altair_chart(rhr_vs_score(df_filtered, n_days=90), use_container_width=True)
+
+with right:
+    st.markdown("### Bad sleep")
+    st.altair_chart(bad_sleep_pareto(df_filtered, n_days=90, score_max=75.0), use_container_width=True)
