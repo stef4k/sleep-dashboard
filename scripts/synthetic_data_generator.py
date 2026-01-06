@@ -68,7 +68,7 @@ def generate_sleep_data(
         # Overall score: correlated with efficiency + amount + deep/rem, penalize high rhr
         score = (
             25
-            + 55*efficiency
+            + 45 *efficiency
             + 0.03*minutes_asleep
             + 0.04*deep_minutes
             + 0.02*rem_minutes
