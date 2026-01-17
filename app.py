@@ -12,9 +12,9 @@ from src.charts import (
     deep_pct_vs_bedtime,
 )
 from src.charts import rhr_over_time_weekly, rhr_vs_score, bad_sleep_pareto
-
-
+import pandas as pd
 import sys
+
 #sys.modules.pop("src.charts", None)
 
 
@@ -128,74 +128,285 @@ st.markdown(
 .badge.good { background: rgba(46, 204, 113, .13); border-color: rgba(46, 204, 113, .25); }
 .badge.warn { background: rgba(241, 196, 15, .16); border-color: rgba(241, 196, 15, .30); }
 .badge.bad  { background: rgba(231, 76, 60,  .13); border-color: rgba(231, 76, 60,  .25); }
+
+/* Plot cards */
+.sleep-card { margin-bottom: 14px; }
+.sleep-card .body { padding-top: 6px; }
+
+/* Reduce Streamlit default top padding for charts */
+div[data-testid="stVerticalBlock"] > div:has(> div[data-testid="stPlotlyChart"]) {
+  margin-top: -6px;
+}
+
+/* Make section headers cleaner */
+h3 { margin-top: 0.2rem; }
+/* Section headers (st.subheader) */
+h2 {
+  font-size: 5rem;        /* default ~1.5rem */
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-top: 1.8rem;
+  margin-bottom: 0.6rem;
+}
+
+/* Lighter caption text */
+p { color: rgba(49,51,63,.72); }
+
+/* Slightly softer background */
+.main { background: #fbfbfd; }
+
+div[data-testid="stVerticalBlockBorderWrapper"]{
+  background: rgba(255,255,255,0.92);
+  border: 1px solid rgba(49,51,63,.10);
+  border-radius: 18px;
+  padding: 14px 16px 10px 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+  margin-bottom: 14px;
+}
+/* Streamlit section headers (st.subheader) */
+div[data-testid="stHeading"] h1,
+div[data-testid="stHeading"] h2,
+div[data-testid="stHeading"] h3 {
+  font-size: 2.1rem !important;
+  font-weight: 850 !important;
+  letter-spacing: -0.01em;
+  margin-top: 1.6rem !important;
+  margin-bottom: 0.6rem !important;
+  line-height: 1.15 !important;
+}
+
+/* If your st.subheader is not inside stHeading in your version, also apply globally */
+h3 {
+  font-size: 2.1rem !important;
+  font-weight: 850 !important;
+}
+/* st.subheader renders as markdown, but it sits inside stMarkdown */
+div[data-testid="stMarkdown"] h3 {
+  font-size: 2.1rem !important;
+  font-weight: 850 !important;
+  letter-spacing: -0.01em;
+  margin-top: 1.6rem !important;
+  margin-bottom: 0.6rem !important;
+  line-height: 1.15 !important;
+}
+/* Main page title (st.title) */
+div[data-testid="stMarkdown"] h1 {
+  font-size: 3.2rem !important;   /* default ~2.5rem */
+  font-weight: 900 !important;
+  letter-spacing: -0.015em;
+  margin-bottom: 0.4rem !important;
+  line-height: 1.05 !important;
+}
+div[data-testid="stMarkdown"] h1 {
+  font-size: 3.6rem !important;
+}
+
+/* App background */
+.main {
+  background:
+    radial-gradient(
+      1200px 600px at 10% 10%,
+      rgba(64, 123, 255, 0.08),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at 90% 20%,
+      rgba(120, 180, 255, 0.10),
+      transparent 55%
+    ),
+    linear-gradient(
+      180deg,
+      #f8faff 0%,
+      #f4f7fd 45%,
+      #eef2fb 100%
+    );
+}
+/* Page background (Streamlit >= 1.30-ish) */
+/* === Deep blue dashboard background (Sleep-style) === */
+[data-testid="stAppViewContainer"] {
+  background:
+    radial-gradient(
+      1200px 700px at 15% 10%,
+      rgba(40, 90, 200, 0.25),
+      transparent 60%
+    ),
+    radial-gradient(
+      1000px 600px at 85% 20%,
+      rgba(90, 140, 255, 0.22),
+      transparent 55%
+    ),
+    linear-gradient(
+      180deg,
+      #0b1a3a 0%,
+      #10265c 35%,
+      #173b8f 70%,
+      #1e4fb3 100%
+    ) !important;
+}
+
+/* Let the gradient show through */
+[data-testid="stAppViewContainer"] > .main {
+  background: transparent !important;
+}
+
+[data-testid="stMainBlockContainer"] {
+  background: transparent !important;
+}
+
+/* Optional: soften sidebar */
+section[data-testid="stSidebar"] > div {
+  background: rgba(20, 40, 90, 0.55) !important;
+  backdrop-filter: blur(12px);
+}
+/* Make the internal content layer transparent so the background shows */
+[data-testid="stAppViewContainer"] > .main {
+  background: transparent !important;
+}
+
+[data-testid="stMainBlockContainer"] {
+  background: transparent !important;
+}
+
+/* Optional: sidebar also transparent so it doesn't look like a white slab */
+section[data-testid="stSidebar"] > div {
+  background: rgba(255,255,255,0.75) !important;
+  backdrop-filter: blur(10px);
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# ----------------------------
-# Header
-# ----------------------------
-st.title("Sleep Compass")
-st.caption("MVP: patterns, rhythm, and one driver relationship.")
 
-# ----------------------------
+# Header
+st.title("Sleep Compass")
+st.caption("A personal decision-making dashboard that turns your sleep logs into actionable, data-driven guidance—spotting patterns, tracking rhythm, and highlighting the behaviors most linked to better nights.")
+
+
+
 # Data loading
-# ----------------------------
-use_real = st.toggle("Use real data (local only)", value=False)
-path = "data/sleep_data.csv" if use_real else "data/synthetic.csv"
+path = "data/sleep_data.csv" #if use_real else "data/synthetic.csv"
 
 df = load_sleep_csv(path)
 
-# ----------------------------
-# Filters
-# ----------------------------
-col1, col2, col3 = st.columns([1, 1, 1])
-with col1:
-    only_night = st.checkbox("Only night sleep", value=True)
-with col2:
-    days = st.selectbox("Range", [7, 30, 90, 365], index=1)
-with col3:
-    metric = st.selectbox("Heatmap metric", ["minutes_asleep", "overall_score", "efficiency"], index=0)
+# --- Time travel: pick an "as-of" date and filter everything accordingly ---
+df["date"] = pd.to_datetime(df["date"], errors="coerce")
+df = df.dropna(subset=["date"])
 
-df_filtered = df.copy()
-if only_night and "is_night_sleep" in df_filtered.columns:
-    df_filtered = df_filtered[df_filtered["is_night_sleep"] == True]
+min_date = df["date"].dt.date.min()
+max_date = df["date"].dt.date.max()
 
-df_recent = df_filtered.tail(days)
-last_night = df_filtered.sort_values("start_time").iloc[-1] if len(df_filtered) > 0 else None
+c1, c2 = st.columns([1, 3])  # adjust ratio as you like
+with c1:
+    as_of_date = st.date_input(
+        "View dashboard as of:",
+        value=max_date,
+        min_value=min_date,
+        max_value=max_date,
+    )
 
-# ----------------------------
-# Recommendations (placeholder logic)
-# ----------------------------
-def bedtime_suggestion_hour(df_for_rec):
+# Use end-of-day timestamp so the whole selected day is included
+as_of_ts = pd.Timestamp(as_of_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+
+def window_by_days(dfx: pd.DataFrame, end_ts: pd.Timestamp, days: int) -> pd.DataFrame:
+    start_ts = (end_ts.floor("D") - pd.Timedelta(days=days - 1))
+    return dfx[(dfx["date"] >= start_ts) & (dfx["date"] <= end_ts)].copy()
+
+
+
+# Filter everything up to "as_of"
+df_all = df[df["date"] <= as_of_ts].copy()
+
+df_night = df_all.copy()
+if "is_night_sleep" in df_night.columns:
+    df_night = df_night[df_night["is_night_sleep"] == True]
+
+# Rolling windows ending at as_of
+df_7_all   = window_by_days(df_all,   as_of_ts, 7)    # includes naps
+df_30_night = window_by_days(df_night, as_of_ts, 30)  # night only
+df_90_night = window_by_days(df_night, as_of_ts, 90)  # night only
+
+# Overview night = latest night up to as_of
+if len(df_night) > 0 and "start_time" in df_night.columns:
+    df_night["start_time"] = pd.to_datetime(df_night["start_time"], errors="coerce")
+    df_night = df_night.dropna(subset=["start_time"])
+    last_night = df_night.sort_values("start_time").iloc[-1] if len(df_night) > 0 else None
+else:
+    last_night = df_night.iloc[-1] if len(df_night) > 0 else None
+
+
+def bedtime_suggestion_hour(last_row, target_h=1 + 15/60, max_shift_min=30):
     """
-    Placeholder: median bedtime among top 25% nights by overall_score.
-    (You’ll refine later.)
+    Bedtime suggestion:
+    - Target is 01:15
+    - If last bedtime was later than target, shift earlier by at most 30 minutes
+    - If last bedtime was earlier than target, keep it (don't push later)
+
+    Returns: suggested bedtime as float hour in [0, 24)
     """
-    if df_for_rec is None or len(df_for_rec) == 0:
+    if last_row is None:
         return None
-    top = df_for_rec[df_for_rec["overall_score"] >= df_for_rec["overall_score"].quantile(0.75)]
-    base = top if len(top) >= 3 else df_for_rec
-    return float(base["start_hour"].median())
+
+    # Get last bedtime as float hour
+    if "start_hour" in last_row:
+        last_h = float(last_row["start_hour"])
+    else:
+        st_dt = pd.to_datetime(last_row.get("start_time", None), errors="coerce")
+        if pd.isna(st_dt):
+            return None
+        last_h = st_dt.hour + st_dt.minute / 60.0
+
+    # Wrap into a night-continuous timeline (e.g., 01:15 -> 25.25)
+    def wrap_night(h):
+        return h if h >= 12 else h + 24
+
+    target_wrapped = wrap_night(target_h)          # 01:15 -> 25.25
+    last_wrapped = wrap_night(last_h)
+
+    # If already earlier than target, keep it
+    if last_wrapped <= target_wrapped:
+        suggested_wrapped = last_wrapped
+    else:
+        # Shift earlier by max 45 min, but never earlier than target
+        suggested_wrapped = max(last_wrapped - (max_shift_min / 60.0), target_wrapped)
+
+    # Convert back to normal 0-24 range
+    return float(suggested_wrapped % 24)
+
 
 def nap_recommendation(last_row):
     """
-    Placeholder: if last night's sleep < 7h => Yes 25 min else No 0 min.
+    Nap rules:
+    - Nap only if (total sleep < 7.5h) OR (score < 75)
+    - If score < 60 OR sleep < 6h   -> 45 min
+    - Elif score < 70 OR sleep < 6.5h -> 35 min
+    - Else -> 23 min
     """
     if last_row is None:
         return (None, None)
-    sleep_min = float(last_row["minutes_asleep"])
-    if sleep_min < 7 * 60:
-        return ("Yes", 25)
-    return ("No", 0)
 
-bedtime_hr = bedtime_suggestion_hour(df_recent)
+    sleep_min = float(last_row.get("minutes_asleep", 0))
+    score = float(last_row.get("overall_score", 0))
+
+    sleep_h = sleep_min / 60.0
+
+    # Gate: only recommend a nap if you actually need it
+    if not (sleep_h < 7.5 or score < 75):
+        return ("No", 0)
+
+    # Duration tiers (highest priority first)
+    if score < 60 or sleep_h < 6.0:
+        return ("Yes", 45)
+
+    if score < 70 or sleep_h < 6.5:
+        return ("Yes", 35)
+
+    return ("Yes", 23)
+
+bedtime_hr = bedtime_suggestion_hour(last_night)
 nap_yesno, nap_min = nap_recommendation(last_night)
 
-# ----------------------------
 # Display helpers
-# ----------------------------
 def score_badge(score: float):
     if score >= 85:
         return ("😄 Great", "good")
@@ -213,6 +424,22 @@ def render_html(html: str):
     # Remove blank lines + leading spaces so Markdown never switches out of HTML mode
     html = "\n".join(line.strip() for line in html.splitlines() if line.strip())
     st.markdown(html, unsafe_allow_html=True)
+  
+def card_open(title: str, subtitle: str = ""):
+    sub = f'<div class="subtitle">{subtitle}</div>' if subtitle else ""
+    render_html(f"""
+    <div class="sleep-card">
+      <div class="hdr">
+        <div>
+          <div class="title">{title}</div>
+          {sub}
+        </div>
+      </div>
+      <div class="body">
+    """)
+
+def card_close():
+    render_html("</div></div>")
 
 def fmt_time_from_hour(h):
     hh = int(h) % 24
@@ -235,9 +462,7 @@ nap_min_safe = int(nap_min) if isinstance(nap_min, (int, float)) else 0
 nap_badge_cls = "good" if nap_yesno_safe == "No" else "warn"
 nap_detail = f"{nap_min_safe} min" if nap_yesno_safe == "Yes" else "0 min"
 
-# ----------------------------
 # Top bar: two cards
-# ----------------------------
 left, right = st.columns([1.15, 1.0], gap="large")
 with left:
     render_html(f"""
@@ -300,22 +525,32 @@ st.subheader("Short-term")
 row1_left, row1_right = st.columns(2, gap="large")
 row2_left, row2_right = st.columns(2, gap="large")
 
-with row1_left:
-    #st.markdown("**Efficiency funnel (last night)**")
-    st.plotly_chart(funnel_trapezoid(last_night), use_container_width=True)
+#st.caption("Last night and the past week—quick feedback loops.")
 
+with row1_left:
+    with st.container(border=True):
+        st.markdown("#### Efficiency funnel")
+        st.caption("How last night’s sleep stages add up")
+        st.plotly_chart(funnel_trapezoid(last_night), use_container_width=True)
 
 with row1_right:
-    st.markdown("**Sleep timeline (last 7 days)**")
-    st.altair_chart(sleep_bar_last_7_days(df_filtered.tail(30)), use_container_width=True)
+    with st.container(border=True):
+        st.markdown("#### Sleep timeline (7 days)")
+        st.caption("Nights + naps in context")
+        st.altair_chart(sleep_bar_last_7_days(df_7_all), use_container_width=True)
 
 with row2_left:
-    st.markdown("**Total sleep vs target (7.5h)**")
-    st.altair_chart(sleep_target_band(df_filtered, target_hours=7.5), use_container_width=True)
+    with st.container(border=True):
+        st.markdown("#### Total sleep vs target")
+        st.caption("Progress toward 7.5h each night")
+        st.altair_chart(sleep_target_band(df_night, target_hours=7.5), use_container_width=True)
 
 with row2_right:
-    #st.markdown("**Sleep composition & quality (last 4 nights)**")
-    st.plotly_chart(plotly_parallel_coords(df_filtered, n_nights=4), use_container_width=True)
+    with st.container(border=True):
+        st.markdown("#### Sleep composition & quality")
+        st.caption("Stage balance and sleep score (last 4 nights)")
+        st.plotly_chart(plotly_parallel_coords(df_night, n_nights=4), use_container_width=True)
+
 
 # Mid term section
 st.markdown("<div style='height: 8px'></div>", unsafe_allow_html=True)
@@ -325,20 +560,28 @@ m1_left, m1_right = st.columns(2, gap="large")
 m2_left, m2_right = st.columns(2, gap="large")
 
 with m1_left:
-    #st.markdown("**Calendar heatmap (total sleep per day)**")
-    st.altair_chart(calendar_heatmap_month(df_filtered, value_col="minutes_asleep"), use_container_width=True)
+    with st.container(border=True):
+        st.markdown("#### Calendar heatmap")
+        st.caption("Daily total sleep across the month")
+        st.altair_chart(calendar_heatmap_month(df_30_night, value_col="minutes_asleep"), use_container_width=True)
 
 with m1_right:
-    #st.markdown("**Sleep rhythm (bedtime & wake-up)**")
-    st.altair_chart(sleep_rhythm_last_30_days(df_filtered), use_container_width=True)
+    with st.container(border=True):
+        st.markdown("#### Sleep rhythm (30 days)")
+        st.caption("Bedtime and wake-up consistency + medians")
+        st.altair_chart(sleep_rhythm_last_30_days(df_30_night), use_container_width=True)
 
 with m2_left:
-    #st.markdown("**Bedtime vs efficiency**")
-    st.altair_chart(start_time_vs_efficiency(df_filtered), use_container_width=True)
+    with st.container(border=True):
+        st.markdown("#### Bedtime vs sleep efficiency")
+        st.caption("How timing relates to quality (trend line is descriptive)")
+        st.altair_chart(start_time_vs_efficiency(df_30_night), use_container_width=True)
 
 with m2_right:
-    #st.markdown("**Deep sleep % vs bedtime**")
-    st.altair_chart(deep_pct_vs_bedtime(df_filtered), use_container_width=True)
+    with st.container(border=True):
+        st.markdown("#### Deep sleep % vs bedtime")
+        st.caption("Timing vs recovery signal (trend line is descriptive)")
+        st.altair_chart(deep_pct_vs_bedtime(df_30_night), use_container_width=True)
 
 
 # Long term sections
@@ -348,9 +591,39 @@ left, right = st.columns(2, gap="large")
 
 with left:
     st.markdown("### Health")
-    st.altair_chart(rhr_over_time_weekly(df_filtered, months=3), use_container_width=True)
-    st.altair_chart(rhr_vs_score(df_filtered, n_days=90), use_container_width=True)
+
+    with st.container(border=True):
+        st.markdown("#### Resting heart rate (weekly)")
+        st.caption("3-month trend (weekly averages)")
+        st.altair_chart(rhr_over_time_weekly(df_90_night, months=3), use_container_width=True)
+
+    with st.container(border=True):
+        st.markdown("#### RHR vs sleep score")
+        st.caption("90-day relationship")
+        st.altair_chart(rhr_vs_score(df_90_night, n_days=90), use_container_width=True)
 
 with right:
     st.markdown("### Bad sleep")
-    st.altair_chart(bad_sleep_pareto(df_filtered, n_days=90, score_max=75.0), use_container_width=True)
+
+    with st.container(border=True):
+        st.markdown("#### Bad sleep signals (Pareto)")
+        st.caption("Triggered signals when score ≤ 75 (last 90 days)")
+        st.altair_chart(bad_sleep_pareto(df_90_night, n_days=90, score_max=75.0), use_container_width=True)
+
+        with st.expander("How to read this"):
+            st.markdown(
+                """
+                This **Pareto chart** shows how often *different bad sleep signals* were triggered
+                across nights with a sleep score ≤ 75.
+
+                Each bar counts **triggered signals**, not nights.
+                A single night can contribute to multiple bars
+                (e.g. short sleep *and* late bedtime).
+
+                The cumulative line answers:
+                *“Which factors account for most of the problems when sleep is bad?”*
+
+                This helps prioritize behaviors to fix first,
+                rather than explaining 100% of bad nights.
+                """
+            )

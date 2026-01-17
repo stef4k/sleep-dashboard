@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import math
 import numpy as np
 
+CHART_HEIGHT = 420
 
 # Helper to format hours as "Xh YYm"
 def fmt_hm_from_hours(h: float) -> str:
@@ -76,7 +77,7 @@ def calendar_heatmap(df: pd.DataFrame, value_col: str = "minutes_asleep"):
             tooltip=["date:T", value_col],
             color=alt.Color(f"{value_col}:Q", title=value_col),
         )
-        .properties(height=220)
+        .properties(height=CHART_HEIGHT)
     )
     return chart
 
@@ -110,7 +111,7 @@ def rhythm_chart(df: pd.DataFrame):
         )
     )
 
-    return (start + end).properties(height=260).resolve_scale(y="independent")
+    return (start + end).properties(height=CHART_HEIGHT).resolve_scale(y="independent")
 
 def bedtime_vs_score(df: pd.DataFrame):
     d = df.copy()
@@ -124,7 +125,7 @@ def bedtime_vs_score(df: pd.DataFrame):
             y=alt.Y("overall_score:Q", title="Overall score"),
             tooltip=["date:T", "start_time:T", "overall_score:Q", "efficiency:Q"]
         )
-        .properties(height=260)
+        .properties(height=CHART_HEIGHT)
     )
     return chart
 
@@ -137,7 +138,7 @@ def funnel_trapezoid(last_night_row):
     if last_night_row is None:
         fig = go.Figure()
         fig.add_annotation(text="No data", x=0.5, y=0.5, showarrow=False)
-        fig.update_layout(height=260)
+        fig.update_layout(height=CHART_HEIGHT)
         return fig
 
     stages = ["Time in bed", "Time asleep", "Light sleep", "REM sleep", "Deep sleep"]
@@ -168,9 +169,9 @@ def funnel_trapezoid(last_night_row):
     )
 
     fig.update_layout(
-        height=260,
+        height=CHART_HEIGHT,
         margin=dict(l=20, r=20, t=35, b=10),
-        title=dict(text="Efficiency funnel (last night)", x=0.0, xanchor="left"),
+        #title=dict(text="Efficiency funnel (last night)", x=0.0, xanchor="left"),
     )
     return fig
 
@@ -232,7 +233,7 @@ def sleep_bar_last_7_days(df: pd.DataFrame):
                         axis=alt.Axis(title="Hour of day", tickCount=13)),
                 x2="x2:Q",
             )
-            .properties(height=260)
+            .properties(height=CHART_HEIGHT)
         )
 
     seg["date_str"] = pd.to_datetime(seg["display_date"]).dt.strftime("%a %d %b")
@@ -277,7 +278,7 @@ def sleep_bar_last_7_days(df: pd.DataFrame):
         .encode(y=alt.Y("date_str:N", sort=order))
     )
 
-    return (bars + axis_layer).properties(height=260)
+    return (bars + axis_layer).properties(height=CHART_HEIGHT)
 
 def sleep_target_band(df: pd.DataFrame, target_hours: float = 7.5):
     """
@@ -391,7 +392,7 @@ def sleep_target_band(df: pd.DataFrame, target_hours: float = 7.5):
         )
     )
 
-    chart = (good_zone + target_rule + stems + line + points).properties(height=260).configure_axis(
+    chart = (good_zone + target_rule + stems + line + points).properties(height=CHART_HEIGHT).configure_axis(
         grid=True,
         gridColor="#e6e6e6",
         tickColor="#bdbdbd",
@@ -551,14 +552,13 @@ def plotly_parallel_coords(df: pd.DataFrame, n_nights: int = 4):
     )
 
     fig.update_layout(
-        height=520,
+        height=CHART_HEIGHT,
         margin=dict(l=95, r=25, t=85, b=25),
-        title=dict(
-            text=f"Sleep composition & quality (last {n_nights} nights)",
-            x=0.0,
-            xanchor="left",
-            y=0.98,
-        ),
+        #title=dict(
+        #    text=f"Sleep composition & quality (last {n_nights} nights)",
+        #    x=0.0 ),
+        #xanchor="left",
+        #y=0.98,
     )
 
     return fig
@@ -667,7 +667,7 @@ def calendar_heatmap_month(df: pd.DataFrame, value_col: str = "minutes_asleep"):
                 alt.Tooltip("sleep_hm:N", title="Total sleep"),
             ]
         )
-        .properties(height=240, title=title)
+        .properties(height=CHART_HEIGHT, title=title)
     )
 
     text = (
@@ -831,7 +831,7 @@ def sleep_rhythm_last_30_days(df: pd.DataFrame):
     )
 
     chart = (base.mark_line() + base.mark_circle(size=60) + median_rules + median_labels).properties(
-        height=260, title="Sleep rhythm (last 30 days, median shown as dotted lines)"
+        height=CHART_HEIGHT, title="Sleep rhythm (last 30 days, median shown as dotted lines)"
     ).configure_view(strokeWidth=0)
     return chart
 
@@ -893,7 +893,7 @@ def start_time_vs_efficiency(df: pd.DataFrame):
         )
     )
 
-    return (pts + trend).properties(height=260, title="Bedtime vs efficiency (last 30 days)").configure_view(strokeWidth=0)
+    return (pts + trend).properties(height=CHART_HEIGHT, title="Bedtime vs efficiency (last 30 days)").configure_view(strokeWidth=0)
 
 
 def deep_pct_vs_bedtime(df: pd.DataFrame):
@@ -953,7 +953,7 @@ def deep_pct_vs_bedtime(df: pd.DataFrame):
         )
     )
 
-    return (pts + trend).properties(height=260, title="Deep % vs bedtime (last 30 days)").configure_view(strokeWidth=0)
+    return (pts + trend).properties(height=CHART_HEIGHT, title="Deep % vs bedtime (last 30 days)").configure_view(strokeWidth=0)
 
 
 def _last_n_days_night(df: pd.DataFrame, n_days: int = 30) -> pd.DataFrame:
@@ -1029,7 +1029,7 @@ def rhr_over_time_weekly(df: pd.DataFrame, months: int = 3):
     pts = base.mark_circle(size=60)
 
     return (line + pts).properties(
-        height=240,
+        height=CHART_HEIGHT,
         title=alt.TitleParams(
             text=f"Resting heart rate (weekly avg, last {months} months)",
             anchor="start",
@@ -1084,8 +1084,8 @@ def rhr_vs_score(df: pd.DataFrame, n_days: int = 90):
     )
 
     return (pts + trend).properties(
-        height=240,
-        title=f"RHR vs sleep score (last {n_days} days)",
+        height=CHART_HEIGHT,
+        title=f"Resting heart rate (RHR) vs sleep score (last {n_days} days)",
         padding={"bottom": 40, "left": 10, "right": 10, "top": 35},
     ).configure_view(strokeWidth=0)
 
@@ -1142,7 +1142,7 @@ def bad_sleep_pareto(df: pd.DataFrame, n_days: int = 30, score_max: float = 75.0
 
     # Reason flags (simple + interpretable)
     flags = pd.DataFrame({
-        "Late bedtime (≥ 02:00)": bad["bed_wrapped"] >= 26.0,              # 2am+
+        "Late bedtime (≥ 02:00)": bad["bed_wrapped"] >= 26.0, # 2am+
         "Short sleep (< 7h)": bad["sleep_h"] < 7.0,
         "Low efficiency (< 0.85)": bad["efficiency"] < 0.85,
         "Woke up a lot (awake high)": (bad["minutes_awake"] >= awake_thr) | (bad["awake_pct"] >= 0.15),
@@ -1184,8 +1184,17 @@ def bad_sleep_pareto(df: pd.DataFrame, n_days: int = 30, score_max: float = 75.0
     line = (
         alt.Chart(counts)
         .mark_line(point=True)
-        .encode(
-            x=alt.X("reason:N", sort="-y", title=None),
+        .encode(x=alt.X(
+            "reason:N",
+            sort="-y",
+            axis=alt.Axis(
+                labelAngle=0,         
+                labelFontSize=10,      
+                labelLimit=160,        # prevent truncation
+                labelPadding=10,       # add breathing room
+                title=None
+            )
+        ),
             y=alt.Y(
                 "cum_pct:Q",
                 title="Cumulative % of triggered signals",
@@ -1200,7 +1209,7 @@ def bad_sleep_pareto(df: pd.DataFrame, n_days: int = 30, score_max: float = 75.0
     )
 
     return alt.layer(bars, line).resolve_scale(y="independent").properties(
-        height=260,
+        height=CHART_HEIGHT,
         title=alt.TitleParams(
             text=f"Bad sleep signals (Pareto of triggered signals, score ≤ {score_max}, last {n_days} days)",
             anchor="start",
