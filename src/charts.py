@@ -440,9 +440,10 @@ def sleep_target_band(df: pd.DataFrame, target_hours: float = 7.5):
 
 def plotly_parallel_coords(df: pd.DataFrame, n_nights: int = 4):
     """
-    Plotly Parcoords (unnormalized) for last n_nights.
-    Adds a Date axis so the hovered line clearly corresponds to a specific night.
-    Score axis + colorbar fixed to 50–100.
+    Plotly Parcoords for last n_nights:
+    - Fix Date label clipping (range headroom + domain headroom)
+    - Remove colorbar
+    - Use discrete line colors (stepped colorscale)
     """
     if df is None or len(df) == 0:
         return None
@@ -468,68 +469,62 @@ def plotly_parallel_coords(df: pd.DataFrame, n_nights: int = 4):
     if agg.empty:
         return None
 
-    # ----------------------------
-    # Add Date axis (for hover / identification)
-    # ----------------------------
+    # --- Date axis (ordinal -> tick labels)
     agg["date_str"] = pd.to_datetime(agg["date"]).dt.strftime("%a %d %b")
-    agg["date_ord"] = list(range(len(agg)))  # 0..n-1
+    agg["date_ord"] = np.arange(len(agg), dtype=int)
 
-    date_rng = [0, max(0, len(agg) - 1)]
+    n = len(agg)
     date_tv = agg["date_ord"].tolist()
     date_tt = agg["date_str"].tolist()
 
-    # ----------------------------
-    # Nice ticks helper
-    # ----------------------------
-    def nice_ticks(series: pd.Series, unit: str, n: int = 3):
-        smin = float(series.min())
-        smax = float(series.max())
-        if smin == smax:
-            pad = 1.0 if unit == "score" else 20.0
-            smin, smax = smin - pad, smax + pad
+    # Headroom so first/last date labels aren't clipped
+    date_rng = [-0.6, (n - 1) + 0.6] if n > 1 else [-0.6, 0.6]
 
-        span = smax - smin
-        candidates = [1, 2, 5, 10] if unit == "score" else [10, 20, 30, 45, 60, 90, 120]
-        raw_step = span / max(n - 1, 1)
-        step = min(candidates, key=lambda c: abs(c - raw_step))
+    # Ticks for minute axes (uses your global nice_ticks(series, n=..., unit=...))
+    awake_tv, awake_tt, awake_rng = nice_ticks(agg["awake"], n=3, unit="min")
+    light_tv, light_tt, light_rng = nice_ticks(agg["light"], n=3, unit="min")
+    rem_tv, rem_tt, rem_rng       = nice_ticks(agg["rem"],   n=3, unit="min")
+    deep_tv, deep_tt, deep_rng    = nice_ticks(agg["deep"],  n=3, unit="min")
 
-        start = math.floor(smin / step) * step
-        end = math.ceil(smax / step) * step
+    # --- Discrete line colors (muted, dark-theme friendly)
+    discrete_colors = [
+    "rgb(202,148,253)",
+    "rgb(231,131,97)",
+    "rgb(33,240,182)",
+    "rgb(206,240,106)",
+    ]
 
-        tickvals = list(range(int(start), int(end + step), int(step)))
-        while len(tickvals) > 4:
-            tickvals = tickvals[::2]
+    # Integer id per polyline
+    agg["line_id"] = np.arange(n, dtype=int)
 
-        # Keep tick labels short (units already in axis label)
-        ticktext = [f"{v:.0f}" for v in tickvals]
-        return tickvals, ticktext, [start, end]
-
-    awake_tv, awake_tt, awake_rng = nice_ticks(agg["awake"], unit="min", n=3)
-    light_tv, light_tt, light_rng = nice_ticks(agg["light"], unit="min", n=3)
-    rem_tv, rem_tt, rem_rng       = nice_ticks(agg["rem"],   unit="min", n=3)
-    deep_tv, deep_tt, deep_rng    = nice_ticks(agg["deep"],  unit="min", n=3)
-
-    # ----------------------------
-    # Fixed score axis range (50–100) + fixed color scale (50–100)
-    # ----------------------------
-    score_rng = [50, 100]
-    score_tv  = [50, 60, 70, 80, 90, 100]
-    score_tt  = [str(v) for v in score_tv]
+    # Build a stepped colorscale so each integer maps to one solid color.
+    # IMPORTANT: Parcoords expects a continuous scale; this makes it *look* discrete.
+    if n == 1:
+        colorscale = [[0.0, discrete_colors[0]], [1.0, discrete_colors[0]]]
+        cmin, cmax = 0, 1
+    else:
+        colorscale = []
+        for i in range(n):
+            c = discrete_colors[i % len(discrete_colors)]
+            a0 = i / (n - 1)
+            a1 = (i + 1) / (n - 1)
+            # Duplicate stops => hard step (no gradient)
+            colorscale.append([a0, c])
+            colorscale.append([min(1.0, a1 - 1e-6), c])
+        cmin, cmax = 0, n - 1
 
     fig = go.Figure(
         go.Parcoords(
-            # Add left padding so first axis ("Date"/"Awake") doesn't clip
-            domain=dict(x=[0.05, 1.0], y=[0.0, 0.92]),
+            # Add headroom so top labels don't clip
+            domain=dict(x=[0.06, 1.0], y=[0.02, 0.90]),
             line=dict(
-                color=agg["score"],
-                colorscale="Blues",
-                showscale=True,
-                cmin=50,
-                cmax=100,
-                colorbar=dict(title="Sleep Score"),
+                color=agg["line_id"],
+                colorscale=colorscale,
+                cmin=cmin,
+                cmax=cmax,
+                showscale=False,  # remove the palette on the right
             ),
             dimensions=[
-                # Date axis so each polyline is clearly identifiable
                 dict(
                     label="Date",
                     values=agg["date_ord"],
@@ -568,9 +563,9 @@ def plotly_parallel_coords(df: pd.DataFrame, n_nights: int = 4):
                 dict(
                     label="Score (/100)",
                     values=agg["score"],
-                    range=score_rng,
-                    tickvals=score_tv,
-                    ticktext=score_tt,
+                    range=[50, 100],
+                    tickvals=[50, 60, 70, 80, 90, 100],
+                    ticktext=["50", "60", "70", "80", "90", "100"],
                 ),
             ],
             labelfont=dict(size=14, color="rgba(255,255,255,0.88)"),
@@ -581,15 +576,13 @@ def plotly_parallel_coords(df: pd.DataFrame, n_nights: int = 4):
 
     fig.update_layout(
         height=CHART_HEIGHT,
-        margin=dict(l=95, r=25, t=85, b=25),
-        #title=dict(
-        #    text=f"Sleep composition & quality (last {n_nights} nights)",
-        #    x=0.0 ),
-        #xanchor="left",
-        #y=0.98,
+        margin=dict(l=95, r=25, t=45, b=30),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
     )
-
     return fig
+
+
 
 
 def _filter_last_n_days(df: pd.DataFrame, n_days: int) -> pd.DataFrame:
