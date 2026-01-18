@@ -193,8 +193,6 @@ h2 {
 /* Lighter caption text */
 p { color: rgba(49,51,63,.72); }
 
-/* Slightly softer background */
-.main { background: #fbfbfd; }
 
 div[data-testid="stVerticalBlockBorderWrapper"]{
   background: rgba(255,255,255,0.92);
@@ -469,6 +467,48 @@ div[data-testid="stCaptionContainer"] * {
 div[data-testid="stMarkdownContainer"] p {
   color: rgba(255,255,255,0.85) !important;
 }
+
+/* =========================
+   FIX st.date_input (BaseWeb) white background
+   Put this LAST in your CSS
+   ========================= */
+
+/* The BaseWeb input wrapper */
+div[data-testid="stDateInput"] div[data-baseweb="input"]{
+  background-color: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.28) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+/* Some versions put the background on an inner div */
+div[data-testid="stDateInput"] div[data-baseweb="input"] > div{
+  background-color: transparent !important;
+}
+
+/* The actual text field should be transparent (so wrapper bg shows) + white text */
+div[data-testid="stDateInput"] div[data-baseweb="input"] input{
+  background: transparent !important;
+  color: rgba(255,255,255,0.95) !important;
+  caret-color: rgba(255,255,255,0.95) !important;
+}
+
+/* Placeholder color */
+div[data-testid="stDateInput"] div[data-baseweb="input"] input::placeholder{
+  color: rgba(255,255,255,0.55) !important;
+}
+
+/* Calendar icon color (SVG) */
+div[data-testid="stDateInput"] div[data-baseweb="input"] svg{
+  fill: rgba(255,255,255,0.85) !important;
+}
+
+/* Focus state */
+div[data-testid="stDateInput"] div[data-baseweb="input"]:focus-within{
+  border-color: rgba(140,190,255,0.75) !important;
+  box-shadow: 0 0 0 3px rgba(120,170,255,0.18) !important;
+}
+
 </style>
 """,
     unsafe_allow_html=True,
