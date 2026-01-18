@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 #CSV
-sleep_data.csv
+#sleep_data.csv
 
 # Distribution / packaging
 .Python
