@@ -6,6 +6,41 @@ import numpy as np
 
 CHART_HEIGHT = 420
 
+def _sleep_dark_altair_theme():
+    return {
+        "config": {
+            "background": "transparent",
+            "view": {"stroke": "transparent"},
+            "axis": {
+                "labelColor": "rgba(255,255,255,0.88)",
+                "titleColor": "rgba(255,255,255,0.92)",
+                "domainColor": "rgba(255,255,255,0.25)",
+                "tickColor": "rgba(255,255,255,0.25)",
+                "gridColor": "rgba(255,255,255,0.12)",
+                "grid": True,
+            },
+            "legend": {
+                "labelColor": "rgba(255,255,255,0.82)",
+                "titleColor": "rgba(255,255,255,0.92)",
+                "symbolStrokeColor": "rgba(255,255,255,0.35)",
+                "symbolFillColor": "rgba(255,255,255,0.35)",
+            },
+            "title": {
+                "color": "rgba(255,255,255,0.92)",
+                "fontSize": 14,
+                "anchor": "start",
+            },
+            "header": {  # for facet headers if you ever use them
+                "labelColor": "rgba(255,255,255,0.88)",
+                "titleColor": "rgba(255,255,255,0.92)",
+            },
+        }
+    }
+
+alt.themes.register("sleep_dark", _sleep_dark_altair_theme)
+alt.themes.enable("sleep_dark")
+
+
 # Helper to format hours as "Xh YYm"
 def fmt_hm_from_hours(h: float) -> str:
     total_min = int(round(h * 60))
@@ -392,14 +427,7 @@ def sleep_target_band(df: pd.DataFrame, target_hours: float = 7.5):
         )
     )
 
-    chart = (good_zone + target_rule + stems + line + points).properties(height=CHART_HEIGHT).configure_axis(
-        grid=True,
-        gridColor="#e6e6e6",
-        tickColor="#bdbdbd",
-        domainColor="#bdbdbd",
-        labelColor="#6b7280",
-        titleColor="#6b7280",
-    ).configure_axisX(
+    chart = (good_zone + target_rule + stems + line + points).properties(height=CHART_HEIGHT).configure_axisX(
         labelAngle=-45,
         labelAlign="right",
         labelBaseline="middle"
@@ -545,9 +573,9 @@ def plotly_parallel_coords(df: pd.DataFrame, n_nights: int = 4):
                     ticktext=score_tt,
                 ),
             ],
-            labelfont=dict(size=14, color="#111827"),
-            tickfont=dict(size=12, color="#111827"),
-            rangefont=dict(size=12, color="#111827"),
+            labelfont=dict(size=14, color="rgba(255,255,255,0.88)"),
+            tickfont=dict(size=12, color="rgba(255,255,255,0.75)"),
+            rangefont=dict(size=12, color="rgba(255,255,255,0.75)"),
         )
     )
 

@@ -16,7 +16,48 @@ import pandas as pd
 import sys
 
 #sys.modules.pop("src.charts", None)
+def apply_plotly_dark(fig):
+    """Make Plotly charts transparent/dark-friendly for a dark dashboard."""
+    # Parallel coords special-case
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",  # outside the plot
+        plot_bgcolor="rgba(0,0,0,0)",   # inside the axes
+        font=dict(color="rgba(255,255,255,0.88)"),
+        margin=dict(l=30, r=20, t=50, b=35),
+        legend=dict(
+            bgcolor="rgba(0,0,0,0)",
+            bordercolor="rgba(255,255,255,0.12)",
+            borderwidth=0,
+            font=dict(color="rgba(255,255,255,0.75)"),
+        ),
+        title=dict(font=dict(color="rgba(255,255,255,0.92)")),
+    )
 
+    # If the figure has cartesian axes, soften grids/ticks
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor="rgba(255,255,255,0.10)",
+        zeroline=False,
+        linecolor="rgba(255,255,255,0.18)",
+        tickcolor="rgba(255,255,255,0.25)",
+        title_font=dict(color="rgba(255,255,255,0.70)"),
+        tickfont=dict(color="rgba(255,255,255,0.70)"),
+    )
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor="rgba(255,255,255,0.10)",
+        zeroline=False,
+        linecolor="rgba(255,255,255,0.18)",
+        tickcolor="rgba(255,255,255,0.25)",
+        title_font=dict(color="rgba(255,255,255,0.70)"),
+        tickfont=dict(color="rgba(255,255,255,0.70)"),
+    )
+    if fig.data and fig.data[0].type == "parcoords":
+      fig.update_traces(
+          labelfont=dict(color="rgba(255,255,255,0.75)"),
+          tickfont=dict(color="rgba(255,255,255,0.60)"),
+      )
+    return fig
 
 # Page config + global styles
 st.set_page_config(page_title="Sleep Compass", layout="wide")
@@ -271,6 +312,162 @@ section[data-testid="stSidebar"] > div {
 section[data-testid="stSidebar"] > div {
   background: rgba(255,255,255,0.75) !important;
   backdrop-filter: blur(10px);
+}
+/* =========================
+   Dark gradient background (page)
+   ========================= */
+html, body, [data-testid="stAppViewContainer"] {
+  background:
+    radial-gradient(1200px 700px at 20% 10%, rgba(70,130,255,0.28), transparent 55%),
+    radial-gradient(900px 600px at 85% 25%, rgba(120,200,255,0.18), transparent 55%),
+    radial-gradient(900px 700px at 30% 85%, rgba(90,110,255,0.18), transparent 60%),
+    linear-gradient(180deg, #07162f 0%, #071b3a 45%, #05122a 100%) !important;
+}
+
+.main .block-container { padding-top: 1.2rem; }
+
+/* =========================
+   Global typography on dark bg
+   ========================= */
+:root{
+  --text: rgba(255,255,255,0.92);
+  --muted: rgba(255,255,255,0.65);
+  --muted2: rgba(255,255,255,0.50);
+  --card: rgba(255,255,255,0.07);
+  --card2: rgba(255,255,255,0.05);
+  --border: rgba(255,255,255,0.12);
+  --border2: rgba(255,255,255,0.18);
+  --shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stMarkdownContainer"] li,
+div[data-testid="stCaptionContainer"] {
+  color: var(--muted) !important;
+}
+
+div[data-testid="stMarkdownContainer"] h1,
+div[data-testid="stMarkdownContainer"] h2,
+div[data-testid="stMarkdownContainer"] h3,
+div[data-testid="stMarkdownContainer"] h4 {
+  color: var(--text) !important;
+}
+
+/* Bigger main title */
+div[data-testid="stMarkdown"] h1 {
+  font-size: 3.4rem !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em !important;
+  margin-bottom: 0.35rem !important;
+}
+
+/* Bigger section headers (Short-term / Mid-term) */
+div[data-testid="stMarkdown"] h3 {
+  font-size: 2.2rem !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.015em !important;
+  margin-top: 1.7rem !important;
+  margin-bottom: 0.6rem !important;
+}
+
+/* =========================
+   “Glass” cards (your HTML cards)
+   ========================= */
+.sleep-card{
+  background: linear-gradient(180deg, var(--card) 0%, var(--card2) 100%) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 18px;
+  padding: 18px 18px 14px 18px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.sleep-card .title{
+  color: var(--text) !important;
+  font-weight: 850;
+}
+
+.sleep-card .subtitle{
+  color: var(--muted2) !important;
+}
+
+.sleep-card .kpi .big{
+  color: var(--text) !important;
+}
+
+/* Mini boxes inside recommendation card */
+.mini{
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+}
+.mini .label{ color: var(--muted2) !important; }
+.mini .value{ color: var(--text) !important; }
+
+/* Badges on dark bg */
+.badge{
+  color: var(--text) !important;
+  border: 1px solid rgba(255,255,255,0.16) !important;
+  background: rgba(255,255,255,0.06) !important;
+}
+.badge.good { background: rgba(46, 204, 113, .18) !important; border-color: rgba(46, 204, 113, .35) !important; }
+.badge.warn { background: rgba(241, 196, 15, .20) !important; border-color: rgba(241, 196, 15, .40) !important; }
+.badge.bad  { background: rgba(231, 76, 60,  .18) !important; border-color: rgba(231, 76, 60,  .38) !important; }
+
+/* =========================
+   Streamlit bordered containers (your plot cards)
+   ========================= */
+div[data-testid="stVerticalBlockBorderWrapper"]{
+  background: linear-gradient(180deg, var(--card) 0%, var(--card2) 100%) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 18px !important;
+  padding: 14px 16px 10px 16px !important;
+  box-shadow: var(--shadow) !important;
+  backdrop-filter: blur(10px);
+}
+
+/* Make headers/captions inside plot cards readable */
+div[data-testid="stVerticalBlockBorderWrapper"] h4,
+div[data-testid="stVerticalBlockBorderWrapper"] h3,
+div[data-testid="stVerticalBlockBorderWrapper"] strong{
+  color: var(--text) !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"] p{
+  color: var(--muted2) !important;
+}
+
+/* =========================
+   Inputs (date picker) on dark bg
+   ========================= */
+div[data-testid="stDateInput"] label {
+  color: var(--muted) !important;
+  font-weight: 650 !important;
+}
+
+div[data-testid="stDateInput"] input {
+  background: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
+  color: var(--text) !important;
+}
+
+/* =========================
+   Plot backgrounds (so charts don’t sit on white)
+   ========================= */
+div[data-testid="stPlotlyChart"] > div {
+  background: transparent !important;
+}
+.vega-embed, .vega-embed canvas, .vega-embed svg {
+  background: transparent !important;
+}
+
+/* FORCE st.caption text to white-ish */
+div[data-testid="stCaptionContainer"] * {
+  color: rgba(255,255,255,0.85) !important;
+}
+
+/* In some Streamlit versions, caption is rendered as <p> in markdown container */
+div[data-testid="stMarkdownContainer"] p {
+  color: rgba(255,255,255,0.85) !important;
 }
 </style>
 """,
@@ -531,7 +728,10 @@ with row1_left:
     with st.container(border=True):
         st.markdown("#### Efficiency funnel")
         st.caption("How last night’s sleep stages add up")
-        st.plotly_chart(funnel_trapezoid(last_night), use_container_width=True)
+
+        fig = funnel_trapezoid(last_night)
+        fig = apply_plotly_dark(fig)
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 with row1_right:
     with st.container(border=True):
@@ -544,12 +744,14 @@ with row2_left:
         st.markdown("#### Total sleep vs target")
         st.caption("Progress toward 7.5h each night")
         st.altair_chart(sleep_target_band(df_night, target_hours=7.5), use_container_width=True)
-
 with row2_right:
     with st.container(border=True):
         st.markdown("#### Sleep composition & quality")
         st.caption("Stage balance and sleep score (last 4 nights)")
-        st.plotly_chart(plotly_parallel_coords(df_night, n_nights=4), use_container_width=True)
+
+        fig = plotly_parallel_coords(df_night, n_nights=4)
+        fig = apply_plotly_dark(fig)
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 # Mid term section
