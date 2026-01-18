@@ -14,8 +14,13 @@ from src.charts import (
 from src.charts import rhr_over_time_weekly, rhr_vs_score, bad_sleep_pareto
 import pandas as pd
 from contextlib import contextmanager
+import base64
+from pathlib import Path
 
-#sys.modules.pop("src.charts", None)
+def img_to_base64(path: str) -> str:
+    return base64.b64encode(Path(path).read_bytes()).decode("utf-8")
+
+
 def apply_plotly_dark(fig):
     """Make Plotly charts transparent/dark-friendly for a dark dashboard."""
     is_parcoords = bool(fig.data) and (getattr(fig.data[0], "type", "") == "parcoords")
@@ -459,13 +464,65 @@ div[data-testid="stVerticalBlock"]:has(.section-marker) > div{
   background: transparent !important;
 }
 
+/* ===== Header logo inside the top box ===== */
+.header-marker { display: none !important; }
 
+div[data-testid="stVerticalBlock"]:has(.header-marker){
+  position: relative !important;
+}
 
+div[data-testid="stVerticalBlock"]:has(.header-marker){
+  position: relative !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(.header-marker) .sleep-logo-wrap{
+  position: absolute !important;
+  top: 0px !important;     /* push down */
+  right: 18px !important;
+
+  width: 175px !important;
+  height: 175px !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+
+  background: rgba(255,255,255,0.03) !important; /* optional subtle */
+  box-shadow: 0 10px 18px rgba(0,0,0,0.35) !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(.header-marker) img.sleep-logo{
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+
+  width: 170px !important;     /* make the image bigger than circle */
+  height: auto !important;
+
+  transform: translate(-50%, -50%) scale(1.05) !important; /* center + fit */
+  transform-origin: center !important;
+
+  display: block !important;
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
+LOGO_PATH = "images/logo.png"
+logo_b64 = img_to_base64(LOGO_PATH)
+# ===== Top header box (title + date input + overview/reco + logo) =====
+with st.container():
+    # marker so CSS knows "this is the header block"
+    st.markdown('<span class="header-marker"></span>', unsafe_allow_html=True)
+
+    # the logo (top-right inside this container)
+    st.markdown(
+    f"""
+    <div class="sleep-logo-wrap">
+      <img class="sleep-logo" src="data:image/png;base64,{logo_b64}" />
+    </div>
+    """,
+    unsafe_allow_html=True
+    )
 
 # Header
 st.title("Sleep Compass")
