@@ -851,7 +851,7 @@ with section_card("Mid-term"):
     with m2_left:
         with st.container(border=True):
             st.markdown("#### Bedtime vs sleep efficiency")
-            st.caption("How timing relates to quality (trend line is descriptive)")
+            st.caption("How timing relates to quality")
             st.altair_chart(
                 start_time_vs_efficiency(df_30_night),
                 use_container_width=True
@@ -860,7 +860,7 @@ with section_card("Mid-term"):
     with m2_right:
         with st.container(border=True):
             st.markdown("#### Deep sleep % vs bedtime")
-            st.caption("Timing vs recovery signal (trend line is descriptive)")
+            st.caption("Timing vs recovery signal")
             st.altair_chart(
                 deep_pct_vs_bedtime(df_30_night),
                 use_container_width=True
