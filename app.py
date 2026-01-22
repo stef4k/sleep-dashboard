@@ -502,6 +502,12 @@ div[data-testid="stVerticalBlock"]:has(.header-marker) img.sleep-logo{
 
   display: block !important;
 }
+
+
+[data-testid="stElementToolbar"] { 
+  display: none !important; 
+}
+
 </style>
 """,
     unsafe_allow_html=True,

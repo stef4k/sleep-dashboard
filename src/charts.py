@@ -802,7 +802,7 @@ def sleep_rhythm_last_30_days(df: pd.DataFrame):
     # Semantically chosen colors
     color_scale = alt.Scale(
         domain=["Bedtime", "Wake-up"],
-        range=["#4B2E83", "#F28E2B"],
+        range=["#A78BFA", "#F28E2B"],
     )
 
     # Dotted lines  for median bedtime and wakeuptime
