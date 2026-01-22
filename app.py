@@ -807,7 +807,7 @@ with section_card("Short-term"):
         #with chart_card("Sleep timeline (7 days)", "Nights + naps in context"):
         st.markdown("#### Sleep timeline (7 days)")
         st.caption("Nights + naps in context")
-        st.altair_chart(sleep_bar_last_7_days(df_7_all), use_container_width=True)
+        st.altair_chart(sleep_bar_last_7_days(df_7_all), use_container_width=True, theme=None)
 
     with row2_left:
         #with chart_card("Total sleep vs target", "Progress toward 7.5h each night"):
