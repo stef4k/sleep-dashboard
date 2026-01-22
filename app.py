@@ -532,7 +532,7 @@ with st.container():
 
 # Header
 st.title("Sleep Compass")
-st.caption("Turn sleep logs into smarter nights—track your rhythm and habits that matter.")
+st.caption("Turn sleep logs into smarter nights - track your rhythm and habits that matter.")
 
 
 
