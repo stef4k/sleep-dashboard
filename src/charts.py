@@ -1191,7 +1191,7 @@ def bad_sleep_pareto(df: pd.DataFrame, n_days: int = 30, score_max: float = 75.0
         alt.Chart(counts)
         .mark_bar()
         .encode(
-            x=alt.X("reason:N", sort="-y", title=None, axis=alt.Axis(labelAngle=0, labelOverlap=False,
+            x=alt.X("reason:N", sort="-y", title=None, axis=alt.Axis(labelAngle=-30, labelOverlap=False,
                                                         labelLimit=1000, labelPadding=10, ticks=True)),
             y=alt.Y("count:Q", title="Reason count"),
             tooltip=[
