@@ -8,6 +8,7 @@ __pycache__/
 
 #CSV
 #sleep_data.csv
+commands.txt
 
 # Distribution / packaging
 .Python

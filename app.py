@@ -127,6 +127,22 @@ div[data-testid="stMarkdownContainer"] li{
   color: var(--muted) !important;
 }
 
+/* Expander chevron: make arrow visible on dark background */
+[data-testid="stExpander"] summary{
+  color: #ffffff !important;
+}
+[data-testid="stExpander"] summary svg{
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+  fill: #ffffff !important;
+}
+[data-testid="stExpander"] summary svg [stroke]{
+  stroke: #ffffff !important;
+}
+[data-testid="stExpander"] summary svg [fill]{
+  fill: #ffffff !important;
+}
+
 /* Captions: force white (not gray) */
 div[data-testid="stCaptionContainer"] *{
   color: var(--muted) !important;
