@@ -852,7 +852,7 @@ def sleep_rhythm_last_30_days(df: pd.DataFrame):
     )
 
     chart = (base.mark_line() + base.mark_circle(size=60) + median_rules + median_labels).properties(
-        height=CHART_HEIGHT, title="Sleep rhythm (last 30 days, median shown as dotted lines)"
+        height=CHART_HEIGHT, title=""
     ).configure_view(strokeWidth=0)
     return chart
 
@@ -914,7 +914,7 @@ def start_time_vs_efficiency(df: pd.DataFrame):
         )
     )
 
-    return (pts + trend).properties(height=CHART_HEIGHT, title="Bedtime vs efficiency (last 30 days)").configure_view(strokeWidth=0)
+    return (pts + trend).properties(height=CHART_HEIGHT, title="").configure_view(strokeWidth=0)
 
 
 def deep_pct_vs_bedtime(df: pd.DataFrame):
@@ -974,7 +974,7 @@ def deep_pct_vs_bedtime(df: pd.DataFrame):
         )
     )
 
-    return (pts + trend).properties(height=CHART_HEIGHT, title="Deep % vs bedtime (last 30 days)").configure_view(strokeWidth=0)
+    return (pts + trend).properties(height=CHART_HEIGHT, title="").configure_view(strokeWidth=0)
 
 
 def _last_n_days_night(df: pd.DataFrame, n_days: int = 30) -> pd.DataFrame:
