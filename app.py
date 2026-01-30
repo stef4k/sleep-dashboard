@@ -112,7 +112,7 @@ html, body, [data-testid="stAppViewContainer"]{
   background: transparent !important;
 }
 
-.main .block-container{ padding-top: 1.2rem; }
+.main .block-container{ padding-top: 0.4rem; }
 
 /* Global text */
 div[data-testid="stMarkdownContainer"] h1,
@@ -120,6 +120,13 @@ div[data-testid="stMarkdownContainer"] h2,
 div[data-testid="stMarkdownContainer"] h3,
 div[data-testid="stMarkdownContainer"] h4{
   color: var(--text) !important;
+}
+
+/* Title size */
+div[data-testid="stMarkdownContainer"] h1{
+  font-size: 5rem !important;
+  margin-top: 0 !important;
+  margin-bottom: 0.35rem !important;
 }
 
 div[data-testid="stMarkdownContainer"] p,
@@ -515,6 +522,7 @@ div[data-testid="stVerticalBlock"]:has(.header-marker){
 
 div[data-testid="stVerticalBlock"]:has(.header-marker){
   position: relative !important;
+  padding-top: 6px !important;   /* bring title closer to top border */
 }
 
 div[data-testid="stVerticalBlock"]:has(.header-marker) .sleep-logo-wrap{
