@@ -219,11 +219,13 @@ div[data-testid="stContainer"] p{
 }
 
 /* =========================
-   Date input (BaseWeb) — remove white slab
+   Date input (BaseWeb) – remove white slab
    ========================= */
 div[data-testid="stDateInput"] label{
-  color: var(--muted) !important;
-  font-weight: 650 !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  font-size: 0.98rem !important;
+  opacity: 1 !important;
 }
 
 /* The wrapper carries the background */
@@ -241,6 +243,30 @@ div[data-testid="stDateInput"] div[data-baseweb="input"] input::placeholder{
 }
 div[data-testid="stDateInput"] div[data-baseweb="input"] svg{
   fill: rgba(255,255,255,0.85) !important;
+}
+
+/* =========================
+   Radio input (Streamlit) – match date input box style
+   ========================= */
+div[data-testid="stRadio"] label{
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  font-size: 0.98rem !important;
+  opacity: 1 !important;
+}
+/* Wrap the entire radio group in a "box" */
+div[data-testid="stRadio"]:has([role="radiogroup"]) > div{
+  background: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.28) !important;
+  border-radius: 12px !important;
+  padding: 8px 12px !important;
+}
+div[data-testid="stRadio"] [role="radiogroup"]{
+  display: flex !important;
+  gap: 14px !important;
+}
+div[data-testid="stRadio"] span{
+  color: #ffffff !important;
 }
 
 /* Plot backgrounds transparent */
@@ -567,10 +593,16 @@ max_date = df["date"].dt.date.max()
 c1, c2 = st.columns([1, 3])  # adjust ratio as you like
 with c1:
     as_of_date = st.date_input(
-        "View dashboard as of:",
+        "DASHBOARD DATE",
         value=max_date,
         min_value=min_date,
         max_value=max_date,
+    )
+with c2:
+    day_filter = st.radio(
+        "FILTER DAYS",
+        ["All", "Weekdays", "Weekends"],
+        horizontal=True,
     )
 
 # Use end-of-day timestamp so the whole selected day is included
@@ -580,14 +612,28 @@ def window_by_days(dfx: pd.DataFrame, end_ts: pd.Timestamp, days: int) -> pd.Dat
     start_ts = (end_ts.floor("D") - pd.Timedelta(days=days - 1))
     return dfx[(dfx["date"] >= start_ts) & (dfx["date"] <= end_ts)].copy()
 
+def apply_daytype_filter(dfx: pd.DataFrame, mode: str) -> pd.DataFrame:
+    if dfx is None or len(dfx) == 0 or mode == "All":
+        return dfx
+    dow = dfx["date"].dt.dayofweek
+    if mode == "Weekdays":
+        return dfx[dow < 5].copy()
+    return dfx[dow >= 5].copy()
 
 
 # Filter everything up to "as_of"
-df_all = df[df["date"] <= as_of_ts].copy()
+df_all_unfiltered = df[df["date"] <= as_of_ts].copy()
+df_all = apply_daytype_filter(df_all_unfiltered, day_filter)
 
+# Night sleeps for plots (respects day filter)
 df_night = df_all.copy()
 if "is_night_sleep" in df_night.columns:
     df_night = df_night[df_night["is_night_sleep"] == True]
+
+# Night sleeps for overview/recommendations/funnel (ignores day filter)
+df_night_all = df_all_unfiltered.copy()
+if "is_night_sleep" in df_night_all.columns:
+    df_night_all = df_night_all[df_night_all["is_night_sleep"] == True]
 
 # Rolling windows ending at as_of
 df_7_all   = window_by_days(df_all,   as_of_ts, 7)    # includes naps
@@ -595,12 +641,12 @@ df_30_night = window_by_days(df_night, as_of_ts, 30)  # night only
 df_90_night = window_by_days(df_night, as_of_ts, 90)  # night only
 
 # Overview night = latest night up to as_of
-if len(df_night) > 0 and "start_time" in df_night.columns:
-    df_night["start_time"] = pd.to_datetime(df_night["start_time"], errors="coerce")
-    df_night = df_night.dropna(subset=["start_time"])
-    last_night = df_night.sort_values("start_time").iloc[-1] if len(df_night) > 0 else None
+if len(df_night_all) > 0 and "start_time" in df_night_all.columns:
+    df_night_all["start_time"] = pd.to_datetime(df_night_all["start_time"], errors="coerce")
+    df_night_all = df_night_all.dropna(subset=["start_time"])
+    last_night = df_night_all.sort_values("start_time").iloc[-1] if len(df_night_all) > 0 else None
 else:
-    last_night = df_night.iloc[-1] if len(df_night) > 0 else None
+    last_night = df_night_all.iloc[-1] if len(df_night_all) > 0 else None
 
 
 def bedtime_suggestion_hour(last_row, target_h=1 + 15/60, max_shift_min=30):
