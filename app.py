@@ -1,9 +1,9 @@
 import streamlit as st
 from src.data import load_sleep_csv
-from src.charts import funnel_trapezoid, sleep_bar_last_7_days, sleep_target_band, plotly_parallel_coords
+from src.charts import funnel_trapezoid, sleep_bar_last_n_days, sleep_target_band, plotly_parallel_coords
 from src.charts import (
     funnel_trapezoid,
-    sleep_bar_last_7_days,
+    sleep_bar_last_n_days,
     sleep_target_band,
     plotly_parallel_coords,
     calendar_heatmap_month,
@@ -13,6 +13,7 @@ from src.charts import (
 )
 from src.charts import rhr_over_time_weekly, rhr_vs_score, bad_sleep_pareto
 import pandas as pd
+import math
 from contextlib import contextmanager
 import base64
 from pathlib import Path
@@ -275,6 +276,50 @@ div[data-testid="stRadio"] [role="radiogroup"]{
 div[data-testid="stRadio"] span{
   color: #ffffff !important;
 }
+
+/* =========================
+   Slider input (Streamlit) — yellow accent + boxed like other filters
+   ========================= */
+div[data-testid="stSlider"] label{
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  font-size: 0.9rem !important;
+  text-transform: uppercase !important;
+  opacity: 1 !important;
+}
+
+div[data-testid="stSlider"]{
+  background: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.28) !important;
+  border-radius: 12px !important;
+  padding: 6px 10px 8px 10px !important;
+}
+
+div[data-testid="stSlider"] [data-baseweb="slider"]{
+  padding-top: 4px !important;
+}
+
+div[data-testid="stSlider"] [data-baseweb="slider"] [data-testid="stTickBar"]{
+  background: rgba(255,255,255,0.18) !important;
+}
+
+div[data-testid="stSlider"] [data-baseweb="slider"] [data-testid="stTickBar"] *{
+  color: rgba(255,255,255,0.65) !important;
+  opacity: 1 !important;
+}
+
+/* Ensure min/max edge labels are visible */
+div[data-testid="stSlider"] [data-baseweb="slider"]{
+  color: rgba(255,255,255,0.65) !important;
+}
+div[data-testid="stSlider"] [data-baseweb="slider"] span,
+div[data-testid="stSlider"] [data-baseweb="slider"] div{
+  color: rgba(255,255,255,0.65) !important;
+}
+div[data-testid="stSlider"] [data-baseweb="slider"] [data-testid="stThumbValue"]{
+  color: #ff4d3a !important;
+}
+
 
 /* Plot backgrounds transparent */
 div[data-testid="stPlotlyChart"] > div{ background: transparent !important; }
@@ -581,8 +626,8 @@ with st.container():
     )
 
 # Header
-st.title("Sleep Compass")
-st.caption("Turn sleep logs into smarter nights - track your rhythm and habits that matter.")
+st.title("Sleep Is Training")
+st.caption("How my habits, timing, and discipline shape recovery and performance")
 
 
 
@@ -644,7 +689,6 @@ if "is_night_sleep" in df_night_all.columns:
     df_night_all = df_night_all[df_night_all["is_night_sleep"] == True]
 
 # Rolling windows ending at as_of
-df_7_all   = window_by_days(df_all,   as_of_ts, 7)    # includes naps
 df_30_night = window_by_days(df_night, as_of_ts, 30)  # night only
 df_90_night = window_by_days(df_night, as_of_ts, 90)  # night only
 
@@ -862,7 +906,22 @@ with right:
 
 st.markdown("<div style='height: 10px'></div>", unsafe_allow_html=True)
 
-with section_card("Short-term"):
+with st.container():
+    st.markdown('<span class="section-marker"></span>', unsafe_allow_html=True)
+    short_term_header_left, short_term_header_right = st.columns([3, 1], gap="large")
+    with short_term_header_left:
+        st.markdown("## Short-term")
+    with short_term_header_right:
+        short_term_days = st.slider(
+            "SHORT-TERM DAYS",
+            min_value=1,
+            max_value=30,
+            value=7,
+        )
+
+    df_short_all = window_by_days(df_all, as_of_ts, short_term_days)
+    df_short_night = window_by_days(df_night, as_of_ts, short_term_days)
+
     row1_left, row1_right = st.columns(2, gap="large")
     row2_left, row2_right = st.columns(2, gap="large")
 
@@ -875,46 +934,73 @@ with section_card("Short-term"):
 
     with row1_right:
         #with chart_card("Sleep timeline (7 days)", "Nights + naps in context"):
-        st.markdown("#### Sleep timeline (7 days)")
+        st.markdown(f"#### Sleep timeline ({short_term_days} days)")
         st.caption("Nights + naps in context")
-        st.altair_chart(sleep_bar_last_7_days(df_7_all), use_container_width=True, theme=None)
+        st.altair_chart(
+            sleep_bar_last_n_days(df_short_all, n_days=short_term_days),
+            use_container_width=True,
+            theme=None,
+        )
 
     with row2_left:
         #with chart_card("Total sleep vs target", "Progress toward 7.5h each night"):
         st.markdown("#### Total sleep vs target")
         st.caption("Progress toward 7.5h each night")
-        st.altair_chart(sleep_target_band(df_night, target_hours=7.5), use_container_width=True)
+        st.altair_chart(
+            sleep_target_band(df_short_night, target_hours=7.5, n_days=short_term_days),
+            use_container_width=True,
+        )
 
     with row2_right:
         #with chart_card("Sleep composition & quality", "Stage balance and sleep score (last 4 nights)"):
         st.markdown("#### Sleep composition & quality")
-        st.caption("Stage balance and sleep score (last 4 nights)")
-        fig = apply_plotly_dark(plotly_parallel_coords(df_night, n_nights=4))
+        st.caption(f"Stage balance and sleep score (last {short_term_days} nights)")
+        fig = apply_plotly_dark(plotly_parallel_coords(df_short_night, n_nights=short_term_days))
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 # ---------------------------
 # Mid-term section (FULL)
 # ---------------------------
-with section_card("Mid-term"):
+with st.container():
+    st.markdown('<span class="section-marker"></span>', unsafe_allow_html=True)
+    mid_term_header_left, mid_term_header_right = st.columns([3, 1], gap="large")
+    with mid_term_header_left:
+        st.markdown("## Mid-term")
+    with mid_term_header_right:
+        mid_term_days = st.slider(
+            "MID-TERM DAYS",
+            min_value=30,
+            max_value=90,
+            value=30,
+        )
+
+    df_mid_night = window_by_days(df_night, as_of_ts, mid_term_days)
+    calendar_anchor = df_mid_night["date"].max() if len(df_mid_night) > 0 else None
+
     m1_left, m1_right = st.columns(2, gap="large")
     m2_left, m2_right = st.columns(2, gap="large")
 
     with m1_left:
         with st.container(border=True):
             st.markdown("#### Calendar heatmap")
-            st.caption("Daily total sleep across the month")
+            st.caption("Daily total sleep across the months")
             st.altair_chart(
-                calendar_heatmap_month(df_30_night, value_col="minutes_asleep"),
+                calendar_heatmap_month(
+                    df_night,
+                    value_col="minutes_asleep",
+                    anchor_date=calendar_anchor,
+                    n_days=mid_term_days,
+                ),
                 use_container_width=True
             )
 
     with m1_right:
         with st.container(border=True):
-            st.markdown("#### Sleep rhythm (30 days)")
+            st.markdown(f"#### Sleep rhythm ({mid_term_days} days)")
             st.caption("Bedtime and wake-up consistency + medians")
             st.altair_chart(
-                sleep_rhythm_last_30_days(df_30_night),
+                sleep_rhythm_last_30_days(df_mid_night, n_days=mid_term_days),
                 use_container_width=True
             )
 
@@ -923,67 +1009,80 @@ with section_card("Mid-term"):
             st.markdown("#### Bedtime vs sleep efficiency")
             st.caption("How timing relates to quality")
             st.altair_chart(
-                start_time_vs_efficiency(df_30_night),
+                start_time_vs_efficiency(df_mid_night, n_days=mid_term_days),
                 use_container_width=True
             )
 
     with m2_right:
         with st.container(border=True):
-            st.markdown("#### Deep sleep % vs bedtime")
+            st.markdown("#### Bedtime vs deep sleep %")
             st.caption("Timing vs recovery signal")
             st.altair_chart(
-                deep_pct_vs_bedtime(df_30_night),
+                deep_pct_vs_bedtime(df_mid_night, n_days=mid_term_days),
                 use_container_width=True
             )
 
 # ---------------------------
 # Long-term sections (FULL: Health + Bad sleep)
 # ---------------------------
-with section_card("Health & Patterns"):
-  left, right = st.columns(2, gap="large")
+with st.container():
+    st.markdown('<span class="section-marker"></span>', unsafe_allow_html=True)
+    health_header_left, health_header_right = st.columns([3, 1], gap="large")
+    with health_header_left:
+        st.markdown("## Health & Patterns")
+    with health_header_right:
+        health_days = st.slider(
+            "HEALTH & PATTERNS DAYS",
+            min_value=90,
+            max_value=365,
+            value=180,
+        )
 
-  with left:
-      #with section_card("Health"):
-          with st.container(border=True):
-              st.markdown("#### Resting heart rate (weekly)")
-              st.caption("3-month trend (weekly averages)")
-              st.altair_chart(
-                  rhr_over_time_weekly(df_90_night, months=3),
-                  use_container_width=True
-              )
+    df_health_night = window_by_days(df_night, as_of_ts, health_days)
+    health_months = max(1, int(math.ceil(health_days / 30)))
 
-          with st.container(border=True):
-              st.markdown("#### RHR vs sleep score")
-              st.caption("90-day relationship")
-              st.altair_chart(
-                  rhr_vs_score(df_90_night, n_days=90),
-                  use_container_width=True
-              )
+    left, right = st.columns(2, gap="large")
 
-  with right:
-      #with section_card("Bad sleep"):
-          with st.container(border=True):
-              st.markdown("#### Bad sleep signals (Pareto)")
-              st.caption("Triggered signals when score ≤ 75 (last 90 days)")
-              st.altair_chart(
-                  bad_sleep_pareto(df_90_night, n_days=90, score_max=75.0),
-                  use_container_width=True
-              )
+    with left:
+        with st.container(border=True):
+            st.markdown("#### Resting heart rate (weekly)")
+            st.caption(f"{health_months}-month trend (weekly averages)")
+            st.altair_chart(
+                rhr_over_time_weekly(df_health_night, months=health_months),
+                use_container_width=True
+            )
 
-              with st.expander("How to read this"):
-                  st.markdown(
-                      """
-                      This **Pareto chart** shows how often *different bad sleep signals* were triggered
-                      across nights with a sleep score ≤ 75.
+        with st.container(border=True):
+            st.markdown("#### RHR vs sleep score")
+            st.caption(f"{health_days}-day relationship")
+            st.altair_chart(
+                rhr_vs_score(df_health_night, n_days=health_days),
+                use_container_width=True
+            )
 
-                      Each bar counts **triggered signals**, not nights.
-                      A single night can contribute to multiple bars
-                      (e.g. short sleep *and* late bedtime).
+    with right:
+        with st.container(border=True):
+            st.markdown("#### Bad sleep signals (Pareto)")
+            st.caption(f"Triggered signals when score ??? 75 (last {health_days} days)")
+            st.altair_chart(
+                bad_sleep_pareto(df_health_night, n_days=health_days, score_max=75.0),
+                use_container_width=True
+            )
 
-                      The cumulative line answers:
-                      *“Which factors account for most of the problems when sleep is bad?”*
+            with st.expander("How to read this"):
+                st.markdown(
+                    """
+                    This **Pareto chart** shows how often *different bad sleep signals* were triggered
+                    across nights with a sleep score ??? 75.
 
-                      This helps prioritize behaviors to fix first,
-                      rather than explaining 100% of bad nights.
-                      """
-                  )
+                    Each bar counts **triggered signals**, not nights.
+                    A single night can contribute to multiple bars
+                    (e.g. short sleep *and* late bedtime).
+
+                    The cumulative line answers:
+                    *???Which factors account for most of the problems when sleep is bad????*
+
+                    This helps prioritize behaviors to fix first,
+                    rather than explaining 100% of bad nights.
+                    """
+                )
