@@ -1,36 +1,36 @@
 #!/usr/bin/env python3
 """
-Inspect philosophers data from philosophersapi.com.
+Fetch philosopher details (default: Plato) from philosophersapi.com,
+download all image assets, and generate an HTML gallery.
 
-- Prints all unique schools across philosophers.
-- Prints the full JSON tree for Plato (default).
-- Recursively lists all attribute paths.
-- Extracts image URLs and generates an HTML gallery + downloads images locally.
+Uses the documented endpoints:
+  /api/philosophers/name/<Name>
+  /api/philosophers/<UUID>
 """
 
 from __future__ import annotations
 
 import argparse
-import json
+import html
 import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
-from urllib.parse import urlparse
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urljoin, urlparse
 
 import requests
 
 BASE_URL = "https://philosophersapi.com"
-PHILOSOPHERS_ENDPOINT = f"{BASE_URL}/api/philosophers"
 TIMEOUT = 20
 
 OUT_DIR = Path("out")
-IMG_DIR = OUT_DIR / "plato_images"
-GALLERY_PATH = OUT_DIR / "gallery_plato.html"
+IMG_DIR = OUT_DIR / "philosopher_images"
+GALLERY_PATH = OUT_DIR / "gallery.html"
 
-# loose URL regex (handles http/https)
-URL_RE = re.compile(r"^https?://", re.IGNORECASE)
+# Accept absolute URLs OR the API's relative image paths (/Images/...)
+ABS_URL_RE = re.compile(r"^https?://", re.IGNORECASE)
+REL_IMG_RE = re.compile(r"^/images/", re.IGNORECASE)
 
 
 def fetch_json(url: str) -> Any:
@@ -39,163 +39,127 @@ def fetch_json(url: str) -> Any:
     return r.json()
 
 
-def normalize_philosophers(payload: Any) -> List[Dict[str, Any]]:
-    if isinstance(payload, list):
-        return payload
-    if isinstance(payload, dict):
-        for key in ("philosophers", "data", "results", "items"):
-            value = payload.get(key)
-            if isinstance(value, list):
-                return value
-    raise ValueError("Unexpected philosophers payload shape.")
+def to_absolute(url_or_path: str) -> str:
+    s = (url_or_path or "").strip()
+    if not s:
+        return s
+    if ABS_URL_RE.match(s):
+        return s
+    # API returns "/Images/..." paths
+    if s.startswith("/"):
+        return urljoin(BASE_URL, s)
+    # If it’s something odd, still try to join
+    return urljoin(BASE_URL + "/", s)
 
 
-def collect_unique_schools(philosophers: List[Dict[str, Any]]) -> List[str]:
-    schools = set()
-    for ph in philosophers:
-        school = ph.get("school") or ph.get("schools")
-        if isinstance(school, list):
-            for s in school:
-                if s:
-                    schools.add(str(s).strip())
-        elif school:
-            schools.add(str(school).strip())
-    return sorted(s for s in schools if s)
-
-
-def _matches_name(ph: Dict[str, Any], name: str) -> bool:
-    name_l = name.lower()
-    for key in ("name", "wikiTitle", "fullName"):
-        value = ph.get(key)
-        if isinstance(value, str) and value.lower() == name_l:
-            return True
-    return False
-
-
-def pick_philosopher(
-    philosophers: List[Dict[str, Any]],
-    philosopher_id: Optional[str],
-    philosopher_name: Optional[str],
-) -> Optional[Dict[str, Any]]:
-    if philosopher_id:
-        for ph in philosophers:
-            if str(ph.get("id") or ph.get("_id") or "").strip() == philosopher_id:
-                return ph
-
-    if philosopher_name:
-        for ph in philosophers:
-            if _matches_name(ph, philosopher_name):
-                return ph
-
-    return None
-
-
-def print_attribute_paths(obj: Any, prefix: str = "") -> None:
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            new_prefix = f"{prefix}.{k}" if prefix else k
-            print_attribute_paths(v, new_prefix)
-    elif isinstance(obj, list):
-        for i, item in enumerate(obj):
-            new_prefix = f"{prefix}[{i}]"
-            print_attribute_paths(item, new_prefix)
-    else:
-        print(prefix)
-
-
-def is_url(s: str) -> bool:
-    return bool(URL_RE.match(s.strip()))
-
-
-def collect_urls_under_key(obj: Any, target_key: str) -> List[Tuple[str, str]]:
+def extract_image_items(images_obj: Any) -> List[Tuple[str, str]]:
     """
-    Collect (path, url) for any string URL found inside dicts/lists whose
-    parent key matches target_key.
+    Extract (path_label, absolute_url) from the API images dict.
+    Example returned paths:
+      illustrations.ill500x500
+      faceImages.face250x250
     """
-    found: List[Tuple[str, str]] = []
+    items: List[Tuple[str, str]] = []
 
-    def rec(x: Any, path: str, under_target: bool) -> None:
+    def rec(x: Any, prefix: str = "") -> None:
         if isinstance(x, dict):
             for k, v in x.items():
-                new_under = under_target or (k == target_key)
-                new_path = f"{path}.{k}" if path else k
-                rec(v, new_path, new_under)
+                new_prefix = f"{prefix}.{k}" if prefix else k
+                rec(v, new_prefix)
         elif isinstance(x, list):
-            for i, item in enumerate(x):
-                rec(item, f"{path}[{i}]", under_target)
+            for i, v in enumerate(x):
+                rec(v, f"{prefix}[{i}]")
         else:
-            if under_target and isinstance(x, str) and is_url(x):
-                found.append((path, x))
+            if isinstance(x, str) and x.strip():
+                # Keep only plausible image paths/urls
+                s = x.strip()
+                if ABS_URL_RE.match(s) or s.startswith("/"):
+                    items.append((prefix, to_absolute(s)))
 
-    rec(obj, "", False)
-    return found
-
-
-def collect_any_urls(obj: Any) -> List[Tuple[str, str]]:
-    """Fallback: collect any URL-like strings anywhere in the JSON."""
-    found: List[Tuple[str, str]] = []
-
-    def rec(x: Any, path: str) -> None:
-        if isinstance(x, dict):
-            for k, v in x.items():
-                new_path = f"{path}.{k}" if path else k
-                rec(v, new_path)
-        elif isinstance(x, list):
-            for i, item in enumerate(x):
-                rec(item, f"{path}[{i}]")
-        else:
-            if isinstance(x, str) and is_url(x):
-                found.append((path, x))
-
-    rec(obj, "")
-    return found
+    rec(images_obj, "")
+    # de-dupe by url, keep first label
+    seen = set()
+    out = []
+    for label, url in items:
+        if url and url not in seen:
+            seen.add(url)
+            out.append((label, url))
+    return out
 
 
-def safe_filename_from_url(url: str, fallback_index: int) -> str:
+def safe_name_from_url(url: str, fallback_index: int) -> str:
     parsed = urlparse(url)
     name = os.path.basename(parsed.path)
-    if not name or "." not in name:
-        name = f"image_{fallback_index:03d}.jpg"
-    # sanitize
+    if not name:
+        name = f"image_{fallback_index:03d}"
     name = re.sub(r"[^a-zA-Z0-9._-]+", "_", name)
     return name
 
 
-def download_image(url: str, out_path: Path) -> bool:
+def download_image(url: str, out_path: Path) -> Optional[Path]:
+    """
+    Download url if it's truly an image. Returns final saved path, or None.
+    Fixes extension based on Content-Type.
+    """
     try:
-        r = requests.get(url, timeout=TIMEOUT, stream=True)
+        r = requests.get(url, timeout=TIMEOUT, stream=True, allow_redirects=True)
         r.raise_for_status()
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(out_path, "wb") as f:
+
+        ctype = (r.headers.get("Content-Type") or "").lower()
+        if not ctype.startswith("image/"):
+            # You were previously saving HTML error pages as .jpg; stop doing that.
+            head = r.text[:160].replace("\n", " ").replace("\r", " ")
+            print(f"[SKIP] Not an image: {url}")
+            print(f"       Content-Type={ctype!r} BodyStarts={head!r}")
+            return None
+
+        ext_map = {
+            "image/jpeg": ".jpg",
+            "image/jpg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp",
+            "image/gif": ".gif",
+            "image/svg+xml": ".svg",
+        }
+        base_ctype = ctype.split(";")[0].strip()
+        ext = ext_map.get(base_ctype, out_path.suffix or ".img")
+
+        final_path = out_path
+        if final_path.suffix.lower() != ext:
+            final_path = out_path.with_suffix(ext)
+
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(final_path, "wb") as f:
             for chunk in r.iter_content(chunk_size=1024 * 64):
                 if chunk:
                     f.write(chunk)
-        return True
-    except Exception:
-        return False
+
+        return final_path
+    except Exception as e:
+        print(f"[FAIL] {url} -> {e}")
+        return None
 
 
-def write_gallery(items: List[Dict[str, str]], gallery_path: Path) -> None:
+def write_gallery(title: str, items: List[Dict[str, str]], gallery_path: Path) -> None:
     gallery_path.parent.mkdir(parents=True, exist_ok=True)
 
     cards = []
-    for item in items:
+    for it in items:
         badge = (
             '<span class="badge">downloaded</span>'
-            if item.get("downloaded") == "yes"
+            if it.get("downloaded") == "yes"
             else '<span class="badge">remote</span>'
         )
-
         cards.append(
             f"""
     <div class="card">
       <div class="imgwrap">
-        <img src="{item['src']}" alt="Plato image"/>
+        <img src="{html.escape(it['src'])}" alt="image"/>
       </div>
       <div class="info">
-        <div class="path">{item['path']}</div>
+        <div class="path">{html.escape(it['label'])}</div>
         <div class="link">
-          <a href="{item['url']}" target="_blank" rel="noreferrer">source</a>
+          <a href="{html.escape(it['url'])}" target="_blank" rel="noreferrer">source</a>
           {badge}
         </div>
       </div>
@@ -205,12 +169,12 @@ def write_gallery(items: List[Dict[str, str]], gallery_path: Path) -> None:
 
     cards_html = "".join(cards)
 
-    html = f"""<!doctype html>
+    page = f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Plato — Image Gallery</title>
+  <title>{html.escape(title)} — Image Gallery</title>
   <style>
     body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }}
     h1 {{ margin-bottom: 8px; }}
@@ -237,7 +201,7 @@ def write_gallery(items: List[Dict[str, str]], gallery_path: Path) -> None:
   </style>
 </head>
 <body>
-  <h1>Plato — Image Gallery</h1>
+  <h1>{html.escape(title)} — Image Gallery</h1>
   <div class="meta">{len(items)} image URLs found</div>
 
   <div class="grid">
@@ -246,115 +210,55 @@ def write_gallery(items: List[Dict[str, str]], gallery_path: Path) -> None:
 </body>
 </html>
 """
-    gallery_path.write_text(html, encoding="utf-8")
+    gallery_path.write_text(page, encoding="utf-8")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Inspect philosophers API data.")
-    parser.add_argument("--id", dest="philosopher_id", help="Exact philosopher id to print.")
-    parser.add_argument("--name", dest="philosopher_name", help="Exact philosopher name to print.")
-    parser.add_argument(
-        "--endpoint",
-        default=PHILOSOPHERS_ENDPOINT,
-        help=f"Philosophers list endpoint (default: {PHILOSOPHERS_ENDPOINT})",
-    )
-    parser.add_argument(
-        "--no-download",
-        action="store_true",
-        help="Do not download images; gallery will reference remote URLs only.",
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--name", default="Plato", help="Philosopher name (e.g., Plato, John+Locke)")
+    parser.add_argument("--id", default=None, help="Philosopher UUID (overrides --name)")
+    parser.add_argument("--no-download", action="store_true", help="Do not download; use remote URLs only")
     args = parser.parse_args()
 
-    philosopher_name = args.philosopher_name or "Plato"
+    if args.id:
+        url = f"{BASE_URL}/api/philosophers/{args.id}"
+        title = args.id
+    else:
+        url = f"{BASE_URL}/api/philosophers/name/{args.name}"
+        title = args.name.replace("+", " ")
 
-    try:
-        payload = fetch_json(args.endpoint)
-        philosophers = normalize_philosophers(payload)
+    data = fetch_json(url)
+    images_obj = data.get("images", {})
+    image_items = extract_image_items(images_obj)
 
-        schools = collect_unique_schools(philosophers)
-        print("Unique schools:")
-        for s in schools:
-            print(f"- {s}")
+    if not image_items:
+        print("No images found in philosopher details. Printing 'images' field:")
+        print(images_obj)
+        return
 
-        ph = pick_philosopher(philosophers, args.philosopher_id, philosopher_name)
-        print(f"\nPhilosopher detail ({philosopher_name}):")
-        if not ph:
-            print(f"({philosopher_name} not found.)")
-            return
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    IMG_DIR.mkdir(parents=True, exist_ok=True)
 
-        print("\n--- RAW JSON ---")
-        print(json.dumps(ph, indent=2, ensure_ascii=False))
+    gallery_items: List[Dict[str, str]] = []
+    for idx, (label, img_url) in enumerate(image_items, start=1):
+        src = img_url
+        downloaded = "no"
 
-        print("\n--- ATTRIBUTE PATHS ---")
-        print_attribute_paths(ph)
-
-        # 1) Prefer URLs under images subtree
-        image_urls = collect_urls_under_key(ph, "images")
-
-        # 2) If none found, fall back to ANY urls
-        if not image_urls:
-            print("\n(No URLs found under key 'images'. Falling back to any URLs in JSON.)")
-            image_urls = collect_any_urls(ph)
-
-        # De-duplicate while preserving order
-        seen: Set[str] = set()
-        dedup: List[Tuple[str, str]] = []
-        for path, url in image_urls:
-            if url not in seen:
-                seen.add(url)
-                dedup.append((path, url))
-
-        if not dedup:
-            print("\nNo image URLs found.")
-            return
-
-        OUT_DIR.mkdir(parents=True, exist_ok=True)
-        IMG_DIR.mkdir(parents=True, exist_ok=True)
-
-        gallery_items: List[Dict[str, str]] = []
-        print(f"\nFound {len(dedup)} unique image URL(s).")
-
-        for idx, (path, url) in enumerate(dedup, start=1):
-            filename = safe_filename_from_url(url, idx)
-            local_path = IMG_DIR / filename
-
-            downloaded = "no"
-            src = url  # default: remote
-
-            if not args.no_download:
-                ok = download_image(url, local_path)
-                if ok:
-                    downloaded = "yes"
-                    # Make src relative for the HTML gallery
-                    src = str(local_path.relative_to(OUT_DIR)).replace("\\", "/")
-                else:
-                    # keep remote if download failed
-                    downloaded = "no"
-                    src = url
-
-            gallery_items.append(
-                {
-                    "path": path,
-                    "url": url,
-                    "src": src,
-                    "downloaded": downloaded,
-                }
-            )
-
-        write_gallery(gallery_items, GALLERY_PATH)
-
-        print("\nGallery generated:")
-        print(f"- {GALLERY_PATH.resolve()}")
         if not args.no_download:
-            print(f"Images saved under: {IMG_DIR.resolve()}")
-        print("\nOpen the HTML file in your browser to visualize all images.")
+            fname = safe_name_from_url(img_url, idx)
+            saved = download_image(img_url, IMG_DIR / fname)
+            if saved is not None:
+                downloaded = "yes"
+                src = str(saved.relative_to(OUT_DIR)).replace("\\", "/")
 
-    except requests.RequestException as e:
-        print("HTTP error calling philosophers API:", e)
-        sys.exit(1)
-    except Exception as e:
-        print("Error:", str(e))
-        sys.exit(1)
+        gallery_items.append(
+            {"label": label, "url": img_url, "src": src, "downloaded": downloaded}
+        )
+
+    write_gallery(title, gallery_items, GALLERY_PATH)
+    print(f"Gallery: {GALLERY_PATH.resolve()}")
+    if not args.no_download:
+        print(f"Images folder: {IMG_DIR.resolve()}")
 
 
 if __name__ == "__main__":

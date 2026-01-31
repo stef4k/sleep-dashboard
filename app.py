@@ -22,6 +22,7 @@ import html
 import textwrap
 import json
 from pathlib import Path
+from urllib.parse import quote_plus
 
 
 def apply_plotly_dark(fig):
@@ -171,6 +172,76 @@ def _pick_image_from_images(images: dict) -> str:
     return ""
 
 
+def _pick_image_from_philosopher_images(images: dict) -> str:
+    if not isinstance(images, dict):
+        return ""
+    group_order = [
+        ("faceImages", ["face500x500", "face250x250", "face750x750"]),
+        ("fullImages", ["full1200x1600", "full840x1120", "full1260x1680", "full600x800", "full420x560"]),
+        ("illustrations", ["ill750x750", "ill500x500", "ill250x250"]),
+        ("thumbnailIllustrations", ["thumbnailIll150x150", "thumbnailIll100x100", "thumbnailIll50x50"]),
+    ]
+    for group, keys in group_order:
+        group_obj = images.get(group)
+        if isinstance(group_obj, dict):
+            for key in keys:
+                if key in group_obj:
+                    found = _extract_image_value(group_obj.get(key))
+                    if found:
+                        return found
+            for _, value in group_obj.items():
+                found = _extract_image_value(value)
+                if found:
+                    return found
+    return _pick_image_from_images(images)
+
+
+def _extract_philosopher_identifiers(detail: dict) -> tuple[str, str]:
+    ph = detail.get("philosopher") or detail.get("author") or {}
+    name = ph.get("name") or ph.get("fullName") or detail.get("philosopherName") or ""
+    ph_id = (
+        ph.get("id")
+        or ph.get("_id")
+        or ph.get("uuid")
+        or ph.get("philosopherId")
+        or detail.get("philosopherId")
+        or detail.get("philosopherID")
+        or detail.get("philosopherUuid")
+    )
+    return str(ph_id).strip() if ph_id else "", str(name).strip()
+
+
+@st.cache_data(ttl=7 * 24 * 3600, show_spinner=False)
+def fetch_philosopher_by_id(philosopher_id: str) -> dict:
+    r = requests.get(f"{PHILO_BASE}/api/philosophers/{philosopher_id}", timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    return data if isinstance(data, dict) else {}
+
+
+@st.cache_data(ttl=7 * 24 * 3600, show_spinner=False)
+def fetch_philosopher_by_name(name: str) -> dict:
+    safe_name = quote_plus(name.strip())
+    r = requests.get(f"{PHILO_BASE}/api/philosophers/name/{safe_name}", timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    return data if isinstance(data, dict) else {}
+
+
+def get_philosopher_image(philosopher_id: str, name: str) -> str:
+    try:
+        ph_detail = {}
+        if philosopher_id:
+            ph_detail = fetch_philosopher_by_id(philosopher_id)
+        elif name:
+            ph_detail = fetch_philosopher_by_name(name)
+        images = ph_detail.get("images") if isinstance(ph_detail, dict) else {}
+        img = _pick_image_from_philosopher_images(images or {})
+        return _norm_url(img)
+    except Exception:
+        return ""
+
+
 def extract_card(detail: dict) -> dict:
     quote = detail.get("quote") or detail.get("text") or detail.get("content") or ""
     quote = str(quote).strip()
@@ -178,29 +249,6 @@ def extract_card(detail: dict) -> dict:
     ph = detail.get("philosopher") or detail.get("author") or {}
     name = ph.get("name") or ph.get("fullName") or detail.get("philosopherName") or "Philosophy"
     school = ph.get("school") or detail.get("school") or ""
-
-    images = ph.get("images") or {}
-    img = (
-        ph.get("image")
-        or ph.get("imageUrl")
-        or ph.get("imageURL")
-        or ph.get("imagePath")
-        or detail.get("image")
-        or detail.get("imageUrl")
-        or detail.get("imageURL")
-        or detail.get("imagePath")
-        or images.get("face")
-        or images.get("portrait")
-        or images.get("full")
-        or images.get("lg")
-        or images.get("md")
-        or images.get("sm")
-        or images.get("thumb")
-        or images.get("thumbnail")
-    )
-    if not img:
-        img = _pick_image_from_images(images)
-    image_url = _norm_url(img)
 
     quote_date = (
         detail.get("date")
@@ -221,7 +269,7 @@ def extract_card(detail: dict) -> dict:
     return {
         "name": str(name).strip(),
         "quote": quote,
-        "image_url": image_url,
+        "image_url": "",
         "quote_date": quote_date,
         "school": str(school).strip(),
     }
@@ -269,8 +317,9 @@ def get_daily_quote_card(date_: dt.date):
                 yesterday_i = _stable_daily_index(n, date_ - dt.timedelta(days=1))
                 if pick_i == yesterday_i:
                     pick_i = (pick_i + 1) % n
-            card = cached_quotes[pick_i]
+            card = dict(cached_quotes[pick_i])
             if card.get("quote"):
+                card["image_url"] = get_philosopher_image("", card.get("name", ""))
                 return card
 
         allowed_ids = fetch_allowed_quote_ids()
@@ -285,6 +334,8 @@ def get_daily_quote_card(date_: dt.date):
         qid = allowed_ids[pick_i]
         detail = fetch_quote_detail(str(qid))
         card = extract_card(detail)
+        ph_id, ph_name = _extract_philosopher_identifiers(detail)
+        card["image_url"] = get_philosopher_image(ph_id, ph_name or card.get("name", ""))
         if not card["quote"]:
             return fallback
         return card
@@ -793,16 +844,16 @@ div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-wrap{
   position: absolute !important;
   top: 8px !important;
   right: 18px !important;
-  width: 420px !important;
+  width: 520px !important;
   display: flex !important;
-  gap: 12px !important;
+  gap: 16px !important;
   align-items: flex-start !important;
   justify-content: flex-end !important;
 }
 
 div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-img{
-  width: 96px !important;
-  height: 96px !important;
+  width: 128px !important;
+  height: 128px !important;
   border-radius: 50% !important;
   overflow: hidden !important;
   border: 1px solid rgba(255,255,255,0.18) !important;
@@ -817,27 +868,27 @@ div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-img img{
 }
 
 div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-text{
-  max-width: 300px !important;
+  max-width: 360px !important;
   text-align: right !important;
 }
 
 div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-name{
   font-weight: 850 !important;
   color: rgba(255,255,255,0.92) !important;
-  font-size: 0.95rem !important;
+  font-size: 1.2rem !important;
 }
 
 div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-date{
   color: rgba(255,255,255,0.62) !important;
-  font-size: 0.75rem !important;
-  margin-top: 2px !important;
+  font-size: 0.9rem !important;
+  margin-top: 4px !important;
 }
 
 div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-quote{
   color: rgba(255,255,255,0.78) !important;
-  font-size: 0.88rem !important;
-  line-height: 1.3 !important;
-  margin-top: 6px !important;
+  font-size: 1.05rem !important;
+  line-height: 1.45 !important;
+  margin-top: 8px !important;
   white-space: normal !important;
 }
 

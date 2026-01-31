@@ -38,59 +38,6 @@ def get_json(url: str) -> Any:
     return r.json()
 
 
-def _norm_url(u: str) -> str:
-    if not u:
-        return ""
-    u = str(u).strip()
-    if u.startswith("http://") or u.startswith("https://"):
-        return u
-    if u.startswith("//"):
-        return "https:" + u
-    if not u.startswith("/"):
-        u = "/" + u
-    return BASE_URL + u
-
-
-def _extract_image_value(value):
-    if isinstance(value, str):
-        return value
-    if isinstance(value, dict):
-        for key in ("url", "src", "path", "image", "imageUrl", "imageURL", "imagePath"):
-            if key in value:
-                return value.get(key)
-    if isinstance(value, list):
-        for item in value:
-            found = _extract_image_value(item)
-            if found:
-                return found
-    return ""
-
-
-def _pick_image_from_images(images: dict) -> str:
-    if not isinstance(images, dict):
-        return ""
-    preferred_keys = [
-        "full1200x1600",
-        "full840x1120",
-        "full600x800",
-        "ill750x750",
-        "ill500x500",
-        "ill250x250",
-        "thumbnailIll150x150",
-        "thumbnailIll50x50",
-    ]
-    for key in preferred_keys:
-        if key in images:
-            found = _extract_image_value(images.get(key))
-            if found:
-                return found
-    for _, value in images.items():
-        found = _extract_image_value(value)
-        if found:
-            return found
-    return ""
-
-
 def extract_card(detail: dict) -> dict:
     quote = detail.get("quote") or detail.get("text") or detail.get("content") or ""
     quote = str(quote).strip()
@@ -98,29 +45,6 @@ def extract_card(detail: dict) -> dict:
     ph = detail.get("philosopher") or detail.get("author") or {}
     name = ph.get("name") or ph.get("fullName") or detail.get("philosopherName") or "Philosophy"
     school = ph.get("school") or detail.get("school") or ""
-
-    images = ph.get("images") or {}
-    img = (
-        ph.get("image")
-        or ph.get("imageUrl")
-        or ph.get("imageURL")
-        or ph.get("imagePath")
-        or detail.get("image")
-        or detail.get("imageUrl")
-        or detail.get("imageURL")
-        or detail.get("imagePath")
-        or images.get("face")
-        or images.get("portrait")
-        or images.get("full")
-        or images.get("lg")
-        or images.get("md")
-        or images.get("sm")
-        or images.get("thumb")
-        or images.get("thumbnail")
-    )
-    if not img:
-        img = _pick_image_from_images(images)
-    image_url = _norm_url(img)
 
     quote_date = (
         detail.get("date")
@@ -141,7 +65,6 @@ def extract_card(detail: dict) -> dict:
     return {
         "name": str(name).strip(),
         "quote": quote,
-        "image_url": image_url,
         "quote_date": quote_date,
         "school": str(school).strip(),
     }
