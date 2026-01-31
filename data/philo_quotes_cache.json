@@ -1,0 +1,618 @@
+[
+  {
+    "name": "Anaximander",
+    "quote": "Into that from which things take their rise they pass away once more, as is ordained; for they make reparation and satisfaction to one another for the injustice according to the appointed time.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Parmenides",
+    "quote": "For it is the same thing that can be thought and that can be.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Parmenides",
+    "quote": "It is indifferent to me where I am to begin, for there shall I return again.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Socrates",
+    "quote": "What I do not know I do not think I know either",
+    "image_url": "",
+    "quote_date": "399 BC",
+    "school": "Classical Greek"
+  },
+  {
+    "name": "Socrates",
+    "quote": "The unexamined life is not worth living.",
+    "image_url": "",
+    "quote_date": "399 BC",
+    "school": "Classical Greek"
+  },
+  {
+    "name": "Socrates",
+    "quote": "I only wish that wisdom were the kind of thing that flowed … from the vessel that was full to the one that was empty.",
+    "image_url": "",
+    "quote_date": "385 BC",
+    "school": "Classical Greek"
+  },
+  {
+    "name": "Socrates",
+    "quote": "Wonder is the feeling of a philosopher, and philosophy begins in wonder.",
+    "image_url": "",
+    "quote_date": "369 BC",
+    "school": "Classical Greek"
+  },
+  {
+    "name": "Socrates",
+    "quote": "It would be better for me... that multitudes of men should disagree with me rather than that I, being one, should be out of harmony with myself.",
+    "image_url": "",
+    "quote_date": "380 BC",
+    "school": "Classical Greek"
+  },
+  {
+    "name": "Pythagoras",
+    "quote": "There is geometry in the humming of the strings, there is music in the spacing of the spheres.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pythagoreanism"
+  },
+  {
+    "name": "Socrates",
+    "quote": "I cannot teach anybody anything. I can only make them think.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Classical Greek"
+  },
+  {
+    "name": "Plato",
+    "quote": "I shall assume that your silence gives consent",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Platonism"
+  },
+  {
+    "name": "Plato",
+    "quote": "The price good men pay for indifference to public affairs is to be ruled by evil men.",
+    "image_url": "",
+    "quote_date": "380 BC",
+    "school": "Platonism"
+  },
+  {
+    "name": "Plato",
+    "quote": "All that is said by any of us can only be imitation and representation.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Platonism"
+  },
+  {
+    "name": "Plato",
+    "quote": "Knowledge is the food of the soul; and we must take care, my friend, that the Sophist does not deceive us when he praises what he sells, like the dealers wholesale or retail who sell the food of the body; for they praise indiscriminately all their goods, without knowing what are really beneficial or hurtful.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Platonism"
+  },
+  {
+    "name": "Plato",
+    "quote": "Oh dear Pan and all the other Gods of this place, grant that I may be beautiful inside.",
+    "image_url": "",
+    "quote_date": "370 BC",
+    "school": "Platonism"
+  },
+  {
+    "name": "Aristotle",
+    "quote": "All men by nature desire to know. An indication of this is the delight we take in our senses; for even apart from their usefulness they are loved for themselves; and above all others the sense of sight.",
+    "image_url": "",
+    "quote_date": "360 BC",
+    "school": "Aristotelianism"
+  },
+  {
+    "name": "Aristotle",
+    "quote": "That which is desirable on its own account and for the sake of knowing it is more of the nature of wisdom than that which is desirable on account of its results.",
+    "image_url": "",
+    "quote_date": "360 BC",
+    "school": "Aristotelianism"
+  },
+  {
+    "name": "Aristotle",
+    "quote": "It is the mark of an educated man to look for precision in each class of things just so far as the nature of the subject admits; it is evidently equally foolish to accept probable reasoning from a mathematician and to demand from a rhetorician scientific proofs.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Aristotelianism"
+  },
+  {
+    "name": "Aristotle",
+    "quote": "Piety requires us to honor truth above our friends.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Aristotelianism"
+  },
+  {
+    "name": "Heraclitus",
+    "quote": "The path up and down are one and the same.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Aristotle",
+    "quote": "Man is by nature a political animal.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Aristotelianism"
+  },
+  {
+    "name": "Aristotle",
+    "quote": "Wit is cultured insolence.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Aristotelianism"
+  },
+  {
+    "name": "Aristotle",
+    "quote": "All human actions have one or more of these seven causes: chance, nature, compulsions, habit, reason, passion and desire",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Aristotelianism"
+  },
+  {
+    "name": "Aristotle",
+    "quote": "Man, when perfected, is the best of animals, but when separated from law and justice, he is the worst of all.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Aristotelianism"
+  },
+  {
+    "name": "Aristotle",
+    "quote": "Knowledge of the fact differs from knowledge of the reason for the fact.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Aristotelianism"
+  },
+  {
+    "name": "Aristotle",
+    "quote": "A whole is that which has beginning, middle, and end.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Aristotelianism"
+  },
+  {
+    "name": "Augustine of Hippo",
+    "quote": "An unjust law is no law at all.",
+    "image_url": "",
+    "quote_date": "387 AD",
+    "school": "Neo-Platonism"
+  },
+  {
+    "name": "Augustine of Hippo",
+    "quote": "Beauty is indeed a good gift of God; but that the good may not think it a great good, God dispenses it even to the wicked.",
+    "image_url": "",
+    "quote_date": "400 AD",
+    "school": "Neo-Platonism"
+  },
+  {
+    "name": "Augustine of Hippo",
+    "quote": "For when God said, “Let there be light, and there was light,” if we are justified in understanding in this light the creation of the angels, then certainly they were created partakers of the eternal light which is the unchangeable Wisdom of God, by which all things were made, and whom we call the only-begotten Son of God",
+    "image_url": "",
+    "quote_date": "400 AD",
+    "school": "Neo-Platonism"
+  },
+  {
+    "name": "Heraclitus",
+    "quote": "Though wisdom is common, yet the many live as if they had a wisdom of their own.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Augustine of Hippo",
+    "quote": "The Heavenly City outshines Rome, beyond comparison. There, instead of victory, is truth; instead of high rank, holiness; instead of peace, felicity; instead of life, eternity.",
+    "image_url": "",
+    "quote_date": "400 AD",
+    "school": "Neo-Platonism"
+  },
+  {
+    "name": "Augustine of Hippo",
+    "quote": "If there is something more excellent than the truth, then that is God; if not, then truth itself is God.",
+    "image_url": "",
+    "quote_date": "395 AD",
+    "school": "Neo-Platonism"
+  },
+  {
+    "name": "Augustine of Hippo",
+    "quote": "As a youth I prayed, \"Give me chastity and continence, but not right now.\"",
+    "image_url": "",
+    "quote_date": "397 AD",
+    "school": "Neo-Platonism"
+  },
+  {
+    "name": "Marcus Aurelius",
+    "quote": "He was a man who looked at what ought to be done, not to the reputation which is got by a man's acts",
+    "image_url": "",
+    "quote_date": "180 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Marcus Aurelius",
+    "quote": "There is a limit to the time assigned you, and if you don't use it to free yourself it will be gone and never return.",
+    "image_url": "",
+    "quote_date": "180 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Marcus Aurelius",
+    "quote": "This thou must always bear in mind, what is the nature of the whole...",
+    "image_url": "",
+    "quote_date": "180 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Marcus Aurelius",
+    "quote": "Never esteem anything as of advantage to you that will make you break your word or lose your self-respect.",
+    "image_url": "",
+    "quote_date": "180 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Marcus Aurelius",
+    "quote": "The universe is change; our life is what our thoughts make it.",
+    "image_url": "",
+    "quote_date": "180 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Marcus Aurelius",
+    "quote": "Remember this— that there is a proper dignity and proportion to be observed in the performance of every act of life.",
+    "image_url": "",
+    "quote_date": "180 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Marcus Aurelius",
+    "quote": "Reverence the gods, and help men. Short is life.",
+    "image_url": "",
+    "quote_date": "180 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Marcus Aurelius",
+    "quote": "Soon you will have forgotten the world, and soon the world will have forgotten you.",
+    "image_url": "",
+    "quote_date": "180 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Marcus Aurelius",
+    "quote": "Waste no more time arguing what a good man should be. Be one.",
+    "image_url": "",
+    "quote_date": "180 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Heraclitus",
+    "quote": "All entities come to be in accordance with this Logos.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Diogenes",
+    "quote": "The noblest people are those despising wealth, learning, pleasure and life; esteeming above them poverty, ignorance, hardship and death.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Cynicism"
+  },
+  {
+    "name": "Diogenes",
+    "quote": "Aristotle dines when it seems good to King Philip, but Diogenes when he himself pleases.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Cynicism"
+  },
+  {
+    "name": "Diogenes",
+    "quote": "It is not that I am mad, it is only that my head is different from yours.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Cynicism"
+  },
+  {
+    "name": "Diogenes",
+    "quote": "If you are to be kept right, you must possess either good friends or red-hot enemies. The one will warn you, the other will expose you.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Cynicism"
+  },
+  {
+    "name": "Diogenes",
+    "quote": "Self-taught poverty is a help toward philosophy, for the things which philosophy attempts to teach by reasoning, poverty forces us to practice.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Cynicism"
+  },
+  {
+    "name": "Xenophanes",
+    "quote": "Mortals deem that the gods are begotten as they are,\nand have clothes like theirs, and voice and form.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Xenophanes",
+    "quote": "Ethiopians say that their gods are snubnosed and black\nThracians that they are pale and red-haired.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Xenophanes",
+    "quote": "There is one god, greatest among gods and men, similar to mortals neither in shape nor in thought.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Xenophanes",
+    "quote": "For all things are from the earth and to the earth all things come in the end.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Heraclitus",
+    "quote": "No man ever steps in the same river twice.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Seneca",
+    "quote": "It is not the man who has too little, but the man who craves more, that is poor.",
+    "image_url": "",
+    "quote_date": "0065 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Seneca",
+    "quote": "No man can have a peaceful life who thinks too much about lengthening it.",
+    "image_url": "",
+    "quote_date": "0065 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Seneca",
+    "quote": "Withdraw into yourself, as far as you can. Associate with those who will make a better man of you. Welcome those whom you yourself can improve. The process is mutual; for men learn while they teach.",
+    "image_url": "",
+    "quote_date": "0065 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Seneca",
+    "quote": "You do not know where death awaits you; so be ready for it everywhere.",
+    "image_url": "",
+    "quote_date": "0065 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Seneca",
+    "quote": "Man is a reasoning animal.",
+    "image_url": "",
+    "quote_date": "0065 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Seneca",
+    "quote": "All art is but imitation of nature.",
+    "image_url": "",
+    "quote_date": "0065 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Plotinus",
+    "quote": "Perhaps, the good and the beautiful are the same, and must be investigated by one and the same process; and in like manner the base and the evil.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Neoplatonism"
+  },
+  {
+    "name": "Plotinus",
+    "quote": "It is now time, leaving every object of sense far behind, to contemplate, by a certain ascent, a beauty of a much higher order; a beauty not visible to the corporeal eye, but alone manifest to the brighter eye of the soul, independent of all corporeal aid.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Neoplatonism"
+  },
+  {
+    "name": "Plotinus",
+    "quote": "Hence beauty is established in multitude when the many is reduced into one, and in this case it communicates itself both to the parts and to the whole. But when a particular one, composed from similar parts, is received it gives itself to the whole, without departing from the sameness and integrity of its nature.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Neoplatonism"
+  },
+  {
+    "name": "Plotinus",
+    "quote": "Pleasure and distress, fear and courage, desire and aversion, where have these affections and experiences their seat? Clearly, either in the Soul alone, or in the Soul as employing the body, or in some third entity deriving from both.",
+    "image_url": "",
+    "quote_date": "0250 AD",
+    "school": "Neoplatonism"
+  },
+  {
+    "name": "Plotinus",
+    "quote": "All teems with symbol; the wise man is the man who in any one thing can read another.",
+    "image_url": "",
+    "quote_date": "0250 AD",
+    "school": "Neoplatonism"
+  },
+  {
+    "name": "Plotinus",
+    "quote": "We may treat of the Soul as in the body — whether it be set above it or actually within it — since the association of the two constitutes the one thing called the living organism, the Animate.",
+    "image_url": "",
+    "quote_date": "0250 AD",
+    "school": "Neoplatonism"
+  },
+  {
+    "name": "Heraclitus",
+    "quote": "Everything changes and nothing stands still.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Parmenides",
+    "quote": "Thinking and the thought that it is are the same; for you will not find thinking apart from what is, in relation to which it is uttered.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Parmenides",
+    "quote": "And it is all one to me / Where I am to begin; for I shall return there again.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Epicurus",
+    "quote": "Do not spoil what you have by desiring what you have not; remember that what you now have was once among the things you only hoped for.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Epicureanism"
+  },
+  {
+    "name": "Epicurus",
+    "quote": "He who is not satisfied with a little is satisfied with nothing.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Epicureanism"
+  },
+  {
+    "name": "Epicurus",
+    "quote": "Of all the things which wisdom provides to make life entirely happy, much the greatest is the possession of friendship.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Epicureanism"
+  },
+  {
+    "name": "Epictetus",
+    "quote": "It is not things themselves that disturb us, but our judgments about them.",
+    "image_url": "",
+    "quote_date": "0135 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Epictetus",
+    "quote": "No man is free who is not master of himself.",
+    "image_url": "",
+    "quote_date": "0135 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Epictetus",
+    "quote": "Wealth consists not in having great possessions, but in having few wants.",
+    "image_url": "",
+    "quote_date": "0135 AD",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Zeno of Citium",
+    "quote": "Well-being is attained little by little, and nevertheless is no little thing itself.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Zeno of Citium",
+    "quote": "Man conquers the world by conquering himself.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Democritus",
+    "quote": "Happiness resides not in possessions, and not in gold; happiness dwells in the soul.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Democritus",
+    "quote": "The brave man is he who overcomes not only his enemies but his pleasures.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Empedocles",
+    "quote": "For out of these have sprung all things that were and are and shall be.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Empedocles",
+    "quote": "The elements are equal, all alike in age; yet each rules in turn as time revolves.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Pre-Socratic"
+  },
+  {
+    "name": "Protagoras",
+    "quote": "Man is the measure of all things, of things that are, that they are, and of things that are not, that they are not.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Sophism"
+  },
+  {
+    "name": "Gorgias",
+    "quote": "Nothing exists; even if something exists, it cannot be known; even if it can be known, it cannot be communicated.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Sophism"
+  },
+  {
+    "name": "Cleanthes",
+    "quote": "Lead me, Zeus, and you, O Destiny, wherever you have assigned me; I will follow without hesitation.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Chrysippus",
+    "quote": "The wise man will live in accordance with nature.",
+    "image_url": "",
+    "quote_date": "",
+    "school": "Stoicism"
+  },
+  {
+    "name": "Boethius",
+    "quote": "Nothing is miserable unless you think it so; and on the other hand, nothing brings happiness unless you are content with it.",
+    "image_url": "",
+    "quote_date": "0524 AD",
+    "school": "Neoplatonism"
+  },
+  {
+    "name": "Boethius",
+    "quote": "In every adversity of fortune, the worst kind of misery is to have been happy.",
+    "image_url": "",
+    "quote_date": "0524 AD",
+    "school": "Neoplatonism"
+  },
+  {
+    "name": "Cicero",
+    "quote": "The life of the dead is placed in the memory of the living.",
+    "image_url": "",
+    "quote_date": "0043 BC",
+    "school": "Academic Skepticism"
+  },
+  {
+    "name": "Cicero",
+    "quote": "To be ignorant of what occurred before you were born is to remain always a child.",
+    "image_url": "",
+    "quote_date": "0043 BC",
+    "school": "Academic Skepticism"
+  }
+]

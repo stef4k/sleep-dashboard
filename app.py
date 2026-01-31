@@ -15,11 +15,13 @@ from src.charts import rhr_over_time_weekly, rhr_vs_score, bad_sleep_pareto
 import pandas as pd
 import math
 from contextlib import contextmanager
-import base64
+import datetime as dt
+import hashlib
+import requests
+import html
+import textwrap
+import json
 from pathlib import Path
-
-def img_to_base64(path: str) -> str:
-    return base64.b64encode(Path(path).read_bytes()).decode("utf-8")
 
 
 def apply_plotly_dark(fig):
@@ -71,6 +73,223 @@ def apply_plotly_dark(fig):
         )
 
     return fig
+
+
+PHILO_BASE = "https://philosophersapi.com"
+PHILO_QUOTES_INDEX = f"{PHILO_BASE}/api/quotes"
+PHILO_CACHE_PATH = Path("data/philo_quotes_cache.json")
+ALLOWED_SCHOOLS = {
+    "Aristotelianism",
+    "Cynicism",
+    "Platonism",
+    "Pre-Socratic",
+    "Pythagoreanism",
+    "Stoicism",
+    "Neo-Platonism",
+    "Neoplatonism",
+    "Classical Greek",
+}
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def fetch_quotes_index():
+    r = requests.get(PHILO_QUOTES_INDEX, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    if not isinstance(data, list) or len(data) == 0:
+        raise ValueError("Unexpected quotes index payload")
+    return data
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def fetch_quote_detail(qid: str):
+    r = requests.get(f"{PHILO_BASE}/api/quotes/{qid}", timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
+def _stable_daily_index(n: int, date_: dt.date, seed: str = "sleep-compass") -> int:
+    key = f"{seed}|{date_.isoformat()}".encode("utf-8")
+    h = hashlib.sha256(key).hexdigest()
+    return int(h[:8], 16) % n
+
+
+def _get_id(obj: dict):
+    return obj.get("id") or obj.get("_id") or obj.get("quoteID") or obj.get("quoteId")
+
+
+def _norm_url(u: str):
+    if not u:
+        return ""
+    u = str(u).strip()
+    if u.startswith("http://") or u.startswith("https://"):
+        return u
+    if u.startswith("//"):
+        return "https:" + u
+    if not u.startswith("/"):
+        u = "/" + u
+    return PHILO_BASE + u
+
+
+def _extract_image_value(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("url", "src", "path", "image", "imageUrl", "imageURL", "imagePath"):
+            if key in value:
+                return value.get(key)
+    if isinstance(value, list):
+        for item in value:
+            found = _extract_image_value(item)
+            if found:
+                return found
+    return ""
+
+
+def _pick_image_from_images(images: dict) -> str:
+    if not isinstance(images, dict):
+        return ""
+    preferred_keys = [
+        "full1200x1600",
+        "full840x1120",
+        "full600x800",
+        "ill750x750",
+        "ill500x500",
+        "ill250x250",
+        "thumbnailIll150x150",
+        "thumbnailIll50x50",
+    ]
+    for key in preferred_keys:
+        if key in images:
+            found = _extract_image_value(images.get(key))
+            if found:
+                return found
+    for _, value in images.items():
+        found = _extract_image_value(value)
+        if found:
+            return found
+    return ""
+
+
+def extract_card(detail: dict) -> dict:
+    quote = detail.get("quote") or detail.get("text") or detail.get("content") or ""
+    quote = str(quote).strip()
+
+    ph = detail.get("philosopher") or detail.get("author") or {}
+    name = ph.get("name") or ph.get("fullName") or detail.get("philosopherName") or "Philosophy"
+    school = ph.get("school") or detail.get("school") or ""
+
+    images = ph.get("images") or {}
+    img = (
+        ph.get("image")
+        or ph.get("imageUrl")
+        or ph.get("imageURL")
+        or ph.get("imagePath")
+        or detail.get("image")
+        or detail.get("imageUrl")
+        or detail.get("imageURL")
+        or detail.get("imagePath")
+        or images.get("face")
+        or images.get("portrait")
+        or images.get("full")
+        or images.get("lg")
+        or images.get("md")
+        or images.get("sm")
+        or images.get("thumb")
+        or images.get("thumbnail")
+    )
+    if not img:
+        img = _pick_image_from_images(images)
+    image_url = _norm_url(img)
+
+    quote_date = (
+        detail.get("date")
+        or detail.get("quoteDate")
+        or detail.get("year")
+        or detail.get("spokenOn")
+        or detail.get("saidOn")
+        or detail.get("published")
+    )
+    if isinstance(quote_date, dict):
+        year = quote_date.get("year") or quote_date.get("y")
+        month = quote_date.get("month") or quote_date.get("m")
+        day = quote_date.get("day") or quote_date.get("d")
+        parts = [str(p) for p in (day, month, year) if p]
+        quote_date = " ".join(parts)
+    quote_date = str(quote_date).strip() if quote_date else ""
+
+    return {
+        "name": str(name).strip(),
+        "quote": quote,
+        "image_url": image_url,
+        "quote_date": quote_date,
+        "school": str(school).strip(),
+    }
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def fetch_allowed_quote_ids() -> list[str]:
+    idx = fetch_quotes_index()
+    allowed_ids: list[str] = []
+    for item in idx:
+        qid = _get_id(item)
+        if not qid:
+            continue
+        try:
+            detail = fetch_quote_detail(str(qid))
+            card = extract_card(detail)
+            if card.get("school") in ALLOWED_SCHOOLS:
+                allowed_ids.append(str(qid))
+        except Exception:
+            continue
+    return allowed_ids
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def load_quote_cache_file() -> list[dict]:
+    if not PHILO_CACHE_PATH.exists():
+        return []
+    try:
+        data = json.loads(PHILO_CACHE_PATH.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            return data
+    except Exception:
+        return []
+    return []
+
+
+def get_daily_quote_card(date_: dt.date):
+    fallback = {"name": "Daily Anchor", "quote": "Stay consistent.", "image_url": "", "quote_date": ""}
+    try:
+        cached_quotes = load_quote_cache_file()
+        if cached_quotes:
+            n = len(cached_quotes)
+            pick_i = _stable_daily_index(n, date_)
+            if n > 1:
+                yesterday_i = _stable_daily_index(n, date_ - dt.timedelta(days=1))
+                if pick_i == yesterday_i:
+                    pick_i = (pick_i + 1) % n
+            card = cached_quotes[pick_i]
+            if card.get("quote"):
+                return card
+
+        allowed_ids = fetch_allowed_quote_ids()
+        n = len(allowed_ids)
+        if n == 0:
+            return fallback
+        pick_i = _stable_daily_index(n, date_)
+        if n > 1:
+            yesterday_i = _stable_daily_index(n, date_ - dt.timedelta(days=1))
+            if pick_i == yesterday_i:
+                pick_i = (pick_i + 1) % n
+        qid = allowed_ids[pick_i]
+        detail = fetch_quote_detail(str(qid))
+        card = extract_card(detail)
+        if not card["quote"]:
+            return fallback
+        return card
+    except Exception:
+        return fallback
 
 # Page config + global styles
 st.set_page_config(page_title="Sleep Compass", layout="wide")
@@ -558,7 +777,7 @@ div[data-testid="stVerticalBlock"]:has(.section-marker) > div{
   background: transparent !important;
 }
 
-/* ===== Header logo inside the top box ===== */
+/* ===== Header quote block inside the top box ===== */
 .header-marker { display: none !important; }
 
 div[data-testid="stVerticalBlock"]:has(.header-marker){
@@ -570,32 +789,56 @@ div[data-testid="stVerticalBlock"]:has(.header-marker){
   padding-top: 6px !important;   /* bring title closer to top border */
 }
 
-div[data-testid="stVerticalBlock"]:has(.header-marker) .sleep-logo-wrap{
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-wrap{
   position: absolute !important;
-  top: 0px !important;     /* push down */
+  top: 8px !important;
   right: 18px !important;
-
-  width: 175px !important;
-  height: 175px !important;
-  border-radius: 50% !important;
-  overflow: hidden !important;
-
-  background: rgba(255,255,255,0.03) !important; /* optional subtle */
-  box-shadow: 0 10px 18px rgba(0,0,0,0.35) !important;
+  width: 420px !important;
+  display: flex !important;
+  gap: 12px !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
 }
 
-div[data-testid="stVerticalBlock"]:has(.header-marker) img.sleep-logo{
-  position: absolute !important;
-  left: 50% !important;
-  top: 50% !important;
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-img{
+  width: 96px !important;
+  height: 96px !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
+  background: rgba(255,255,255,0.04) !important;
+  flex: 0 0 auto !important;
+}
 
-  width: 170px !important;     /* make the image bigger than circle */
-  height: auto !important;
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-img img{
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
 
-  transform: translate(-50%, -50%) scale(1.05) !important; /* center + fit */
-  transform-origin: center !important;
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-text{
+  max-width: 300px !important;
+  text-align: right !important;
+}
 
-  display: block !important;
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-name{
+  font-weight: 850 !important;
+  color: rgba(255,255,255,0.92) !important;
+  font-size: 0.95rem !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-date{
+  color: rgba(255,255,255,0.62) !important;
+  font-size: 0.75rem !important;
+  margin-top: 2px !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-quote{
+  color: rgba(255,255,255,0.78) !important;
+  font-size: 0.88rem !important;
+  line-height: 1.3 !important;
+  margin-top: 6px !important;
+  white-space: normal !important;
 }
 
 
@@ -608,26 +851,11 @@ div[data-testid="stVerticalBlock"]:has(.header-marker) img.sleep-logo{
     unsafe_allow_html=True,
 )
 
-LOGO_PATH = "images/logo.png"
-logo_b64 = img_to_base64(LOGO_PATH)
-# ===== Top header box (title + date input + overview/reco + logo) =====
-with st.container():
-    # marker so CSS knows "this is the header block"
-    st.markdown('<span class="header-marker"></span>', unsafe_allow_html=True)
-
-    # the logo (top-right inside this container)
-    st.markdown(
-    f"""
-    <div class="sleep-logo-wrap">
-      <img class="sleep-logo" src="data:image/png;base64,{logo_b64}" />
-    </div>
-    """,
-    unsafe_allow_html=True
-    )
+header_slot = st.empty()
 
 # Header
-st.title("Sleep Is Training")
-st.caption("How my habits, timing, and discipline shape recovery and performance")
+st.title("Rise and Shine")
+#st.caption("How habits, timing, and discipline shape recovery and performance")
 
 
 
@@ -657,6 +885,39 @@ with c2:
         ["All", "Weekdays", "Weekends"],
         horizontal=True,
     )
+
+# ===== Top header box (title + date input + overview/reco + quote) =====
+with header_slot.container():
+    # marker so CSS knows "this is the header block"
+    st.markdown('<span class="header-marker"></span>', unsafe_allow_html=True)
+
+    card = get_daily_quote_card(as_of_date)
+    safe_name = html.escape(card["name"])
+    safe_quote = html.escape(card["quote"])
+    safe_date = html.escape(card.get("quote_date", ""))
+    img_html = ""
+    if card["image_url"]:
+        img_html = f'<div class="motivation-img"><img src="{card["image_url"]}" /></div>'
+    else:
+        initials = "".join([p[0] for p in safe_name.split()[:2]]).upper()
+        img_html = (
+            '<div class="motivation-img" '
+            'style="display:flex;align-items:center;justify-content:center;'
+            'color:rgba(255,255,255,0.75);font-weight:800;">'
+            f"{initials}</div>"
+        )
+
+    date_label = safe_date
+    date_html = f'<div class="motivation-date">{date_label}</div>' if date_label else ""
+    header_html = (
+        f'<div class="motivation-wrap">{img_html}'
+        f'<div class="motivation-text">'
+        f'<div class="motivation-name">{safe_name}</div>'
+        f'{date_html}'
+        f'<div class="motivation-quote">&ldquo;{safe_quote}&rdquo;</div>'
+        f"</div></div>"
+    )
+    st.markdown(header_html, unsafe_allow_html=True)
 
 # Use end-of-day timestamp so the whole selected day is included
 as_of_ts = pd.Timestamp(as_of_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
@@ -807,8 +1068,6 @@ def card_open(title: str, subtitle: str = ""):
 def card_close():
     render_html("</div></div>")
 
-from contextlib import contextmanager
-
 @contextmanager
 def chart_card(title: str, subtitle: str = ""):
     box = st.container()  # NOT border=True
@@ -954,7 +1213,7 @@ with st.container():
     with row2_right:
         #with chart_card("Sleep composition & quality", "Stage balance and sleep score (last 4 nights)"):
         st.markdown("#### Sleep composition & quality")
-        st.caption(f"Stage balance and sleep score (last {short_term_days} nights)")
+        st.caption(f"Stage balance and sleep score using parallel coordinates (last {short_term_days} nights)")
         fig = apply_plotly_dark(plotly_parallel_coords(df_short_night, n_nights=short_term_days))
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
