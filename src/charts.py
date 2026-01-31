@@ -1235,10 +1235,10 @@ def bad_sleep_pareto(df: pd.DataFrame, n_days: int = 30, score_max: float = 75.0
 
     # Reason flags (simple + interpretable)
     flags = pd.DataFrame({
-        "Late bedtime (≥ 02:00)": bad["bed_wrapped"] >= 26.0, # 2am+
+        "Late bedtime (≥ 03:00)": bad["bed_wrapped"] >= 27.0, # 3am+
         "Short sleep (< 7h)": bad["sleep_h"] < 7.0,
-        "Low efficiency (< 0.85)": bad["efficiency"] < 0.85,
-        "Woke up a lot (awake high)": (bad["minutes_awake"] >= awake_thr) | (bad["awake_pct"] >= 0.15),
+        "Low efficiency (< 0.80)": bad["efficiency"] < 0.80,
+        "Woke up a lot (relative)": (bad["minutes_awake"] >= awake_thr) | (bad["awake_pct"] >= 0.15),
         "High RHR (relative)": bad["rhr"] >= rhr_thr if not np.isnan(rhr_thr) else False,
         "Low deep sleep (deep% < 12%)": bad["deep_pct"] < 0.12 if "deep_pct" in bad.columns else False,
     }, index=bad.index)
