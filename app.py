@@ -860,8 +860,8 @@ div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-wrap{
 }
 
 div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-img{
-  width: 128px !important;
-  height: 128px !important;
+  width: 152px !important;
+  height: 152px !important;
   border-radius: 50% !important;
   overflow: hidden !important;
   border: 1px solid rgba(255,255,255,0.18) !important;
