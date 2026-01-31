@@ -210,7 +210,7 @@ def funnel_trapezoid(last_night_row):
     )
     return fig
 
-def sleep_bar_last_7_days(df: pd.DataFrame):
+def sleep_bar_last_n_days(df: pd.DataFrame, n_days: int = 7):
     if df is None or len(df) == 0:
         return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
 
@@ -222,9 +222,12 @@ def sleep_bar_last_7_days(df: pd.DataFrame):
     if "is_night_sleep" not in d.columns:
         d["is_night_sleep"] = True
 
-    # Define last 7 calendar days ending at latest end_time date (intuitive)
+    # Define last N calendar days ending at latest end_time date (intuitive)
     max_day = d["end_time"].dt.date.max()
-    last7 = [(pd.to_datetime(max_day) - pd.Timedelta(days=i)).date() for i in range(6, -1, -1)]  # chronological
+    last_days = [
+        (pd.to_datetime(max_day) - pd.Timedelta(days=i)).date()
+        for i in range(n_days - 1, -1, -1)
+    ]  # chronological
 
     def hour_float(ts):
         return ts.hour + ts.minute / 60.0 + ts.second / 3600.0
@@ -247,11 +250,11 @@ def sleep_bar_last_7_days(df: pd.DataFrame):
 
     seg = pd.DataFrame(segments)
 
-    # Keep only the last 7 days window
-    seg = seg[seg["display_date"].isin(last7)]
+    # Keep only the last N days window
+    seg = seg[seg["display_date"].isin(last_days)]
 
-    # Force y-axis labels for all 7 days
-    axis_df = pd.DataFrame({"display_date": last7})
+    # Force y-axis labels for all N days
+    axis_df = pd.DataFrame({"display_date": last_days})
     axis_df["date_str"] = pd.to_datetime(axis_df["display_date"]).dt.strftime("%a %d %b")
     order = list(axis_df["date_str"])
 
@@ -315,7 +318,7 @@ def sleep_bar_last_7_days(df: pd.DataFrame):
 
     return (bars + axis_layer).properties(height=CHART_HEIGHT)
 
-def sleep_target_band(df: pd.DataFrame, target_hours: float = 7.5):
+def sleep_target_band(df: pd.DataFrame, target_hours: float = 7.5, n_days: int = 7):
     """
     Last 7 days total sleep (hours) with:
     - shaded "good zone" from target_hours upward
@@ -341,7 +344,7 @@ def sleep_target_band(df: pd.DataFrame, target_hours: float = 7.5):
         d.groupby("date", as_index=False)["minutes_asleep"]
         .sum()
         .sort_values("date")
-        .tail(7)
+        .tail(n_days)
     )
 
     if len(d) == 0:
@@ -379,6 +382,7 @@ def sleep_target_band(df: pd.DataFrame, target_hours: float = 7.5):
             x=alt.X("date_str:N", sort=order, title=None),
             y=alt.Y("lower:Q", title="Total sleep (hours)", scale=alt.Scale(domain=[0, y_max])),
             y2="upper:Q",
+            tooltip=[],
         )
     )
 
@@ -488,97 +492,124 @@ def plotly_parallel_coords(df: pd.DataFrame, n_nights: int = 4):
 
     # --- Discrete line colors (muted, dark-theme friendly)
     discrete_colors = [
-    "rgb(202,148,253)",
-    "rgb(231,131,97)",
-    "rgb(33,240,182)",
-    "rgb(206,240,106)",
+        "rgb(202,148,253)",
+        "rgb(231,131,97)",
+        "rgb(33,240,182)",
+        "rgb(206,240,106)",
+        "rgb(255,196,84)",
+        "rgb(240,96,255)",
+        "rgb(255,108,72)",
+        "rgb(120,255,208)",
     ]
 
-    # Integer id per polyline
-    agg["line_id"] = np.arange(n, dtype=int)
+    palette = (
+        discrete_colors[:n]
+        if n <= len(discrete_colors)
+        else [discrete_colors[i % len(discrete_colors)] for i in range(n)]
+    )
 
-    # Build a stepped colorscale so each integer maps to one solid color.
-    # IMPORTANT: Parcoords expects a continuous scale; this makes it *look* discrete.
+    # Use normalized values so each line maps to exactly one color band.
     if n == 1:
-        colorscale = [[0.0, discrete_colors[0]], [1.0, discrete_colors[0]]]
-        cmin, cmax = 0, 1
+        line_vals = [0.5]
+        colorscale = [[0.0, palette[0]], [1.0, palette[0]]]
     else:
+        line_vals = np.linspace(0.0, 1.0, n).tolist()
+        edges = [0.0] + [(line_vals[i] + line_vals[i + 1]) / 2 for i in range(n - 1)] + [1.0]
         colorscale = []
-        for i in range(n):
-            c = discrete_colors[i % len(discrete_colors)]
-            a0 = i / (n - 1)
-            a1 = (i + 1) / (n - 1)
-            # Duplicate stops => hard step (no gradient)
-            colorscale.append([a0, c])
-            colorscale.append([min(1.0, a1 - 1e-6), c])
-        cmin, cmax = 0, n - 1
+        for i, color in enumerate(palette):
+            left = edges[i]
+            right = edges[i + 1] if i == n - 1 else max(edges[i + 1] - 1e-6, left)
+            colorscale.append([left, color])
+            colorscale.append([right, color])
+
+    domain_x0, domain_x1 = 0.05, 1.0
+    domain_y0, domain_y1 = 0.07, 0.998
+
+    dimensions = [
+        dict(
+            label="Date",
+            values=agg["date_ord"],
+            range=date_rng,
+            tickvals=date_tv,
+            ticktext=date_tt,
+        ),
+        dict(
+            label="Awake (min)",
+            values=agg["awake"],
+            range=awake_rng,
+            tickvals=awake_tv,
+            ticktext=awake_tt,
+        ),
+        dict(
+            label="Light (min)",
+            values=agg["light"],
+            range=light_rng,
+            tickvals=light_tv,
+            ticktext=light_tt,
+        ),
+        dict(
+            label="REM (min)",
+            values=agg["rem"],
+            range=rem_rng,
+            tickvals=rem_tv,
+            ticktext=rem_tt,
+        ),
+        dict(
+            label="Deep (min)",
+            values=agg["deep"],
+            range=deep_rng,
+            tickvals=deep_tv,
+            ticktext=deep_tt,
+        ),
+        dict(
+            label="Score (/100)",
+            values=agg["score"],
+            range=[50, 100],
+            tickvals=[50, 60, 70, 80, 90, 100],
+            ticktext=["50", "60", "70", "80", "90", "100"],
+        ),
+    ]
 
     fig = go.Figure(
         go.Parcoords(
             # Add headroom so top labels don't clip
-            domain=dict(x=[0.06, 1.0], y=[0.02, 0.90]),
+            domain=dict(x=[domain_x0, domain_x1], y=[domain_y0, domain_y1]),
             line=dict(
-                color=agg["line_id"],
+                color=line_vals,
                 colorscale=colorscale,
-                cmin=cmin,
-                cmax=cmax,
+                cmin=0,
+                cmax=1,
                 showscale=False,  # remove the palette on the right
             ),
-            dimensions=[
-                dict(
-                    label="Date",
-                    values=agg["date_ord"],
-                    range=date_rng,
-                    tickvals=date_tv,
-                    ticktext=date_tt,
-                ),
-                dict(
-                    label="Awake (min)",
-                    values=agg["awake"],
-                    range=awake_rng,
-                    tickvals=awake_tv,
-                    ticktext=awake_tt,
-                ),
-                dict(
-                    label="Light (min)",
-                    values=agg["light"],
-                    range=light_rng,
-                    tickvals=light_tv,
-                    ticktext=light_tt,
-                ),
-                dict(
-                    label="REM (min)",
-                    values=agg["rem"],
-                    range=rem_rng,
-                    tickvals=rem_tv,
-                    ticktext=rem_tt,
-                ),
-                dict(
-                    label="Deep (min)",
-                    values=agg["deep"],
-                    range=deep_rng,
-                    tickvals=deep_tv,
-                    ticktext=deep_tt,
-                ),
-                dict(
-                    label="Score (/100)",
-                    values=agg["score"],
-                    range=[50, 100],
-                    tickvals=[50, 60, 70, 80, 90, 100],
-                    ticktext=["50", "60", "70", "80", "90", "100"],
-                ),
-            ],
-            labelfont=dict(size=14, color="rgba(255,255,255,0.88)"),
-            tickfont=dict(size=12, color="rgba(255,255,255,0.75)"),
-            rangefont=dict(size=12, color="rgba(255,255,255,0.75)"),
+            dimensions=dimensions,
+            labelfont=dict(size=17, color="rgba(255,255,255,1)"),
+            tickfont=dict(size=12, color="rgba(255,255,255,1)"),
+            rangefont=dict(size=12, color="rgba(255,255,255,1)"),
         )
     )
 
+    # Parcoords does not expose axis line colors, so draw white axis lines on top.
+    axis_positions = np.linspace(domain_x0, domain_x1, len(dimensions)).tolist()
+    axis_shapes = [
+        dict(
+            type="line",
+            xref="paper",
+            yref="paper",
+            x0=x,
+            x1=x,
+            y0=domain_y0,
+            y1=domain_y1,
+            line=dict(color="rgba(255,255,255,0.9)", width=1),
+        )
+        for x in axis_positions
+    ]
+
     fig.update_layout(
-        height=CHART_HEIGHT,
-        margin=dict(l=95, r=25, t=45, b=30),
+        height=CHART_HEIGHT + 42,
+        margin=dict(l=95, r=25, t=0, b=20),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
+        shapes=axis_shapes,
     )
     return fig
 
@@ -594,7 +625,12 @@ def _filter_last_n_days(df: pd.DataFrame, n_days: int) -> pd.DataFrame:
     min_date = (pd.to_datetime(max_date) - pd.Timedelta(days=n_days - 1)).date()
     return d[(d["date"] >= min_date) & (d["date"] <= max_date)].sort_values("date")
 
-def calendar_heatmap_month(df: pd.DataFrame, value_col: str = "minutes_asleep"):
+def calendar_heatmap_month(
+    df: pd.DataFrame,
+    value_col: str = "minutes_asleep",
+    anchor_date=None,
+    n_days: int | None = None,
+):
     if df is None or len(df) == 0:
         return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
 
@@ -621,10 +657,25 @@ def calendar_heatmap_month(df: pd.DataFrame, value_col: str = "minutes_asleep"):
     if daily.empty:
         return alt.Chart(pd.DataFrame({"msg": ["No daily data"]})).mark_text(size=16).encode(text="msg:N")
 
-    latest = daily["day"].max()
-    daily = daily[(daily["day"].dt.year == latest.year) & (daily["day"].dt.month == latest.month)].copy()
-    if daily.empty:
-        return alt.Chart(pd.DataFrame({"msg": ["No rows in latest month"]})).mark_text(size=16).encode(text="msg:N")
+    if anchor_date is not None:
+        anchor_ts = pd.to_datetime(anchor_date, errors="coerce")
+        if pd.isna(anchor_ts):
+            latest = daily["day"].max()
+        else:
+            latest = anchor_ts.floor("D")
+    else:
+        latest = daily["day"].max()
+
+    if n_days is not None and n_days > 0:
+        max_day = latest
+        min_day = max_day - pd.Timedelta(days=n_days - 1)
+        daily = daily[(daily["day"] >= min_day) & (daily["day"] <= max_day)].copy()
+        if daily.empty:
+            return alt.Chart(pd.DataFrame({"msg": ["No rows in selected day window"]})).mark_text(size=16).encode(text="msg:N")
+    else:
+        daily = daily[(daily["day"].dt.year == latest.year) & (daily["day"].dt.month == latest.month)].copy()
+        if daily.empty:
+            return alt.Chart(pd.DataFrame({"msg": ["No rows in latest month"]})).mark_text(size=16).encode(text="msg:N")
 
     # Convert to hours
     daily["sleep_h"] = daily["total_min"] / 60.0
@@ -651,15 +702,26 @@ def calendar_heatmap_month(df: pd.DataFrame, value_col: str = "minutes_asleep"):
     daily["dow"] = daily["day"].dt.day_name()
     daily["dom"] = daily["day"].dt.day.astype(int)
 
-    first = pd.Timestamp(latest.year, latest.month, 1)
-    first_monday_index = first.dayofweek  # Mon=0
-    daily["wom"] = ((daily["dom"] + first_monday_index - 1) // 7).astype(int)
+    first = pd.to_datetime(
+        dict(year=daily["day"].dt.year, month=daily["day"].dt.month, day=1)
+    )
+    first_monday_index = first.dt.dayofweek  # Mon=0
+    daily["wom"] = ((daily["dom"] + first_monday_index - 1) // 7 + 1).astype(int)
+    daily["month_name"] = daily["day"].dt.strftime("%b")
+    daily["month_week"] = daily["month_name"] + " W" + daily["wom"].astype(str)
+    month_week_order = daily.sort_values("day")["month_week"].unique().tolist()
+    month_tick_vals = (
+        daily.sort_values("day")
+        .groupby("month_name", as_index=False)["month_week"]
+        .first()["month_week"]
+        .tolist()
+    )
 
     # Tooltip formatting
     daily["sleep_h_str"] = daily["sleep_h"].apply(lambda h: f"{h:.1f}h")
     daily["sleep_h_clamped_str"] = daily["sleep_h_clamped"].apply(lambda h: f"{h:.1f}h")
 
-    title = f"Calendar heatmap ({latest.strftime('%B %Y')})"
+    title = ""
 
     # Green / Yellow / Red palette (fixed bins)
     band_domain = ["4.5–6", "6–7.5", "7.5–9"]
@@ -669,7 +731,17 @@ def calendar_heatmap_month(df: pd.DataFrame, value_col: str = "minutes_asleep"):
         alt.Chart(daily)
         .mark_rect(cornerRadius=6)
         .encode(
-            x=alt.X("wom:O", title=None, axis=alt.Axis(labelAngle=0, ticks=False)),
+            x=alt.X(
+                "month_week:O",
+                sort=month_week_order,
+                title="Month",
+                axis=alt.Axis(
+                    labelAngle=0,
+                    ticks=False,
+                    values=month_tick_vals,
+                    labelExpr="split(datum.value, ' ')[0]",
+                ),
+            ),
             y=alt.Y("dow:O", sort=dow_order, title=None),
             color=alt.Color(
                 "sleep_h_clamped:Q",
@@ -695,7 +767,7 @@ def calendar_heatmap_month(df: pd.DataFrame, value_col: str = "minutes_asleep"):
         alt.Chart(daily)
         .mark_text(fontSize=12)
         .encode(
-            x="wom:O",
+            x=alt.X("month_week:O", sort=month_week_order),
             y=alt.Y("dow:O", sort=dow_order),
             text=alt.Text("dom:O"),
             tooltip=[
@@ -708,7 +780,7 @@ def calendar_heatmap_month(df: pd.DataFrame, value_col: str = "minutes_asleep"):
     return (rect + text).configure_view(strokeWidth=0)
 
 
-def sleep_rhythm_last_30_days(df: pd.DataFrame):
+def sleep_rhythm_last_30_days(df: pd.DataFrame, n_days: int = 30):
     if df is None or len(df) == 0:
         return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
 
@@ -722,9 +794,9 @@ def sleep_rhythm_last_30_days(df: pd.DataFrame):
     if len(d) == 0:
         return alt.Chart(pd.DataFrame({"msg": ["No night sleep rows"]})).mark_text(size=16).encode(text="msg:N")
 
-    # Filter last 30 days based on available max date
+    # Filter last N days based on available max date
     max_day = d["date"].dt.floor("D").max()
-    min_day = max_day - pd.Timedelta(days=29)
+    min_day = max_day - pd.Timedelta(days=n_days - 1)
     d = d[(d["date"].dt.floor("D") >= min_day) & (d["date"].dt.floor("D") <= max_day)].copy()
 
     # Ensure start/end datetime exist
@@ -858,7 +930,7 @@ def sleep_rhythm_last_30_days(df: pd.DataFrame):
 
 
 
-def start_time_vs_efficiency(df: pd.DataFrame):
+def start_time_vs_efficiency(df: pd.DataFrame, n_days: int = 30):
     """
     Scatter: bedtime (wrapped) vs efficiency, last 30 days.
     Color by score for extra context.
@@ -866,7 +938,7 @@ def start_time_vs_efficiency(df: pd.DataFrame):
     if df is None or len(df) == 0:
         return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
 
-    d = _filter_last_n_days(df, 30).copy()
+    d = _filter_last_n_days(df, n_days).copy()
     if "is_night_sleep" in d.columns:
         d = d[d["is_night_sleep"] == True]
     if len(d) == 0:
@@ -876,12 +948,12 @@ def start_time_vs_efficiency(df: pd.DataFrame):
     d["bed_h"] = d["start_hour"].apply(lambda h: h if h >= 21 else h + 24)
 
 
-    tickvals = list(range(21, 31))  # 21 → 30
+    tickvals = list(range(21, 32))  # 21 → 31 (07:00 next day)
 
     x_axis = alt.X(
         "bed_h:Q",
         title="Bedtime",
-        scale=alt.Scale(domain=[21, 30]),
+        scale=alt.Scale(domain=[21, 31]),
         axis=alt.Axis(
             values=tickvals,
             labelExpr="format(datum.value % 24, '02') + ':00'",
@@ -917,14 +989,14 @@ def start_time_vs_efficiency(df: pd.DataFrame):
     return (pts + trend).properties(height=CHART_HEIGHT, title="").configure_view(strokeWidth=0)
 
 
-def deep_pct_vs_bedtime(df: pd.DataFrame):
+def deep_pct_vs_bedtime(df: pd.DataFrame, n_days: int = 30):
     """
     Scatter: bedtime (wrapped) vs deep sleep percentage (night), last 30 days.
     """
     if df is None or len(df) == 0:
         return alt.Chart(pd.DataFrame({"msg": ["No data"]})).mark_text(size=16).encode(text="msg:N")
 
-    d = _filter_last_n_days(df, 30).copy()
+    d = _filter_last_n_days(df, n_days).copy()
     if "is_night_sleep" in d.columns:
         d = d[d["is_night_sleep"] == True]
     if len(d) == 0:
@@ -935,12 +1007,12 @@ def deep_pct_vs_bedtime(df: pd.DataFrame):
     d["deep_pct_100"] = (d["deep_pct"] * 100).astype(float)
 
     
-    tickvals = list(range(21, 31))  # 21 → 30
+    tickvals = list(range(21, 32))  # 21 → 31 (07:00 next day)
 
     x_axis = alt.X(
         "bed_h:Q",
         title="Bedtime",
-        scale=alt.Scale(domain=[21, 30]),
+        scale=alt.Scale(domain=[21, 31]),
         axis=alt.Axis(
             values=tickvals,
             labelExpr="format(datum.value % 24, '02') + ':00'",
@@ -1051,12 +1123,12 @@ def rhr_over_time_weekly(df: pd.DataFrame, months: int = 3):
 
     return (line + pts).properties(
         height=CHART_HEIGHT,
-        title=alt.TitleParams(
-            text=f"Resting heart rate (weekly avg, last {months} months)",
-            anchor="start",
-            fontSize=14,
-            dy=0,
-        ),
+        #title=alt.TitleParams(
+            #text=f"Resting heart rate (weekly avg, last {months} months)",
+            #anchor="start",
+            #fontSize=14,
+            #dy=0,
+        #),
         padding={"left": 10, "right": 10, "top": 35, "bottom": 45},  # <- THIS fixes clipping
     ).configure_view(strokeWidth=0)
 
@@ -1106,7 +1178,7 @@ def rhr_vs_score(df: pd.DataFrame, n_days: int = 90):
 
     return (pts + trend).properties(
         height=CHART_HEIGHT,
-        title=f"Resting heart rate (RHR) vs sleep score (last {n_days} days)",
+        #title=f"Resting heart rate (RHR) vs sleep score (last {n_days} days)",
         padding={"bottom": 40, "left": 10, "right": 10, "top": 35},
     ).configure_view(strokeWidth=0)
 
@@ -1231,10 +1303,10 @@ def bad_sleep_pareto(df: pd.DataFrame, n_days: int = 30, score_max: float = 75.0
 
     return alt.layer(bars, line).resolve_scale(y="independent").properties(
         height=CHART_HEIGHT,
-        title=alt.TitleParams(
-            text=f"Bad sleep signals (Pareto of triggered signals, score ≤ {score_max}, last {n_days} days)",
-            anchor="start",
-            fontSize=14,
-        ),
+        #title=alt.TitleParams(
+            #text=f"Bad sleep signals (Pareto of triggered signals, score ≤ {score_max}, last {n_days} days)",
+            #anchor="start",
+            #fontSize=14,
+        #),
         padding={"top": 35, "bottom": 70, "left": 10, "right": 55},
     ).configure_view(strokeWidth=0)

@@ -1,9 +1,9 @@
 import streamlit as st
 from src.data import load_sleep_csv
-from src.charts import funnel_trapezoid, sleep_bar_last_7_days, sleep_target_band, plotly_parallel_coords
+from src.charts import funnel_trapezoid, sleep_bar_last_n_days, sleep_target_band, plotly_parallel_coords
 from src.charts import (
     funnel_trapezoid,
-    sleep_bar_last_7_days,
+    sleep_bar_last_n_days,
     sleep_target_band,
     plotly_parallel_coords,
     calendar_heatmap_month,
@@ -13,12 +13,16 @@ from src.charts import (
 )
 from src.charts import rhr_over_time_weekly, rhr_vs_score, bad_sleep_pareto
 import pandas as pd
+import math
 from contextlib import contextmanager
-import base64
+import datetime as dt
+import hashlib
+import requests
+import html
+import textwrap
+import json
 from pathlib import Path
-
-def img_to_base64(path: str) -> str:
-    return base64.b64encode(Path(path).read_bytes()).decode("utf-8")
+from urllib.parse import quote_plus
 
 
 def apply_plotly_dark(fig):
@@ -70,6 +74,273 @@ def apply_plotly_dark(fig):
         )
 
     return fig
+
+
+PHILO_BASE = "https://philosophersapi.com"
+PHILO_QUOTES_INDEX = f"{PHILO_BASE}/api/quotes"
+PHILO_CACHE_PATH = Path("data/philo_quotes_cache.json")
+ALLOWED_SCHOOLS = {
+    "Aristotelianism",
+    "Cynicism",
+    "Platonism",
+    "Pre-Socratic",
+    "Pythagoreanism",
+    "Stoicism",
+    "Neo-Platonism",
+    "Neoplatonism",
+    "Classical Greek",
+}
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def fetch_quotes_index():
+    r = requests.get(PHILO_QUOTES_INDEX, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    if not isinstance(data, list) or len(data) == 0:
+        raise ValueError("Unexpected quotes index payload")
+    return data
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def fetch_quote_detail(qid: str):
+    r = requests.get(f"{PHILO_BASE}/api/quotes/{qid}", timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
+def _stable_daily_index(n: int, date_: dt.date, seed: str = "sleep-compass") -> int:
+    key = f"{seed}|{date_.isoformat()}".encode("utf-8")
+    h = hashlib.sha256(key).hexdigest()
+    return int(h[:8], 16) % n
+
+
+def _get_id(obj: dict):
+    return obj.get("id") or obj.get("_id") or obj.get("quoteID") or obj.get("quoteId")
+
+
+def _norm_url(u: str):
+    if not u:
+        return ""
+    u = str(u).strip()
+    if u.startswith("http://") or u.startswith("https://"):
+        return u
+    if u.startswith("//"):
+        return "https:" + u
+    if not u.startswith("/"):
+        u = "/" + u
+    return PHILO_BASE + u
+
+
+def _extract_image_value(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("url", "src", "path", "image", "imageUrl", "imageURL", "imagePath"):
+            if key in value:
+                return value.get(key)
+    if isinstance(value, list):
+        for item in value:
+            found = _extract_image_value(item)
+            if found:
+                return found
+    return ""
+
+
+def _pick_image_from_images(images: dict) -> str:
+    if not isinstance(images, dict):
+        return ""
+    preferred_keys = [
+        "full1200x1600",
+        "full840x1120",
+        "full600x800",
+        "ill750x750",
+        "ill500x500",
+        "ill250x250",
+        "thumbnailIll150x150",
+        "thumbnailIll50x50",
+    ]
+    for key in preferred_keys:
+        if key in images:
+            found = _extract_image_value(images.get(key))
+            if found:
+                return found
+    for _, value in images.items():
+        found = _extract_image_value(value)
+        if found:
+            return found
+    return ""
+
+
+def _pick_image_from_philosopher_images(images: dict) -> str:
+    if not isinstance(images, dict):
+        return ""
+    group_order = [
+        ("faceImages", ["face500x500", "face250x250", "face750x750"]),
+        ("fullImages", ["full1200x1600", "full840x1120", "full1260x1680", "full600x800", "full420x560"]),
+        ("illustrations", ["ill750x750", "ill500x500", "ill250x250"]),
+        ("thumbnailIllustrations", ["thumbnailIll150x150", "thumbnailIll100x100", "thumbnailIll50x50"]),
+    ]
+    for group, keys in group_order:
+        group_obj = images.get(group)
+        if isinstance(group_obj, dict):
+            for key in keys:
+                if key in group_obj:
+                    found = _extract_image_value(group_obj.get(key))
+                    if found:
+                        return found
+            for _, value in group_obj.items():
+                found = _extract_image_value(value)
+                if found:
+                    return found
+    return _pick_image_from_images(images)
+
+
+def _extract_philosopher_identifiers(detail: dict) -> tuple[str, str]:
+    ph = detail.get("philosopher") or detail.get("author") or {}
+    name = ph.get("name") or ph.get("fullName") or detail.get("philosopherName") or ""
+    ph_id = (
+        ph.get("id")
+        or ph.get("_id")
+        or ph.get("uuid")
+        or ph.get("philosopherId")
+        or detail.get("philosopherId")
+        or detail.get("philosopherID")
+        or detail.get("philosopherUuid")
+    )
+    return str(ph_id).strip() if ph_id else "", str(name).strip()
+
+
+@st.cache_data(ttl=7 * 24 * 3600, show_spinner=False)
+def fetch_philosopher_by_id(philosopher_id: str) -> dict:
+    r = requests.get(f"{PHILO_BASE}/api/philosophers/{philosopher_id}", timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    return data if isinstance(data, dict) else {}
+
+
+@st.cache_data(ttl=7 * 24 * 3600, show_spinner=False)
+def fetch_philosopher_by_name(name: str) -> dict:
+    safe_name = quote_plus(name.strip())
+    r = requests.get(f"{PHILO_BASE}/api/philosophers/name/{safe_name}", timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    return data if isinstance(data, dict) else {}
+
+
+def get_philosopher_image(philosopher_id: str, name: str) -> str:
+    try:
+        ph_detail = {}
+        if philosopher_id:
+            ph_detail = fetch_philosopher_by_id(philosopher_id)
+        elif name:
+            ph_detail = fetch_philosopher_by_name(name)
+        images = ph_detail.get("images") if isinstance(ph_detail, dict) else {}
+        img = _pick_image_from_philosopher_images(images or {})
+        return _norm_url(img)
+    except Exception:
+        return ""
+
+
+def extract_card(detail: dict) -> dict:
+    quote = detail.get("quote") or detail.get("text") or detail.get("content") or ""
+    quote = str(quote).strip()
+
+    ph = detail.get("philosopher") or detail.get("author") or {}
+    name = ph.get("name") or ph.get("fullName") or detail.get("philosopherName") or "Philosophy"
+    school = ph.get("school") or detail.get("school") or ""
+
+    quote_date = (
+        detail.get("date")
+        or detail.get("quoteDate")
+        or detail.get("year")
+        or detail.get("spokenOn")
+        or detail.get("saidOn")
+        or detail.get("published")
+    )
+    if isinstance(quote_date, dict):
+        year = quote_date.get("year") or quote_date.get("y")
+        month = quote_date.get("month") or quote_date.get("m")
+        day = quote_date.get("day") or quote_date.get("d")
+        parts = [str(p) for p in (day, month, year) if p]
+        quote_date = " ".join(parts)
+    quote_date = str(quote_date).strip() if quote_date else ""
+
+    return {
+        "name": str(name).strip(),
+        "quote": quote,
+        "image_url": "",
+        "quote_date": quote_date,
+        "school": str(school).strip(),
+    }
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def fetch_allowed_quote_ids() -> list[str]:
+    idx = fetch_quotes_index()
+    allowed_ids: list[str] = []
+    for item in idx:
+        qid = _get_id(item)
+        if not qid:
+            continue
+        try:
+            detail = fetch_quote_detail(str(qid))
+            card = extract_card(detail)
+            if card.get("school") in ALLOWED_SCHOOLS:
+                allowed_ids.append(str(qid))
+        except Exception:
+            continue
+    return allowed_ids
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def load_quote_cache_file() -> list[dict]:
+    if not PHILO_CACHE_PATH.exists():
+        return []
+    try:
+        data = json.loads(PHILO_CACHE_PATH.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            return data
+    except Exception:
+        return []
+    return []
+
+
+def get_daily_quote_card(date_: dt.date):
+    fallback = {"name": "Daily Anchor", "quote": "Stay consistent.", "image_url": "", "quote_date": ""}
+    try:
+        cached_quotes = load_quote_cache_file()
+        if cached_quotes:
+            n = len(cached_quotes)
+            pick_i = _stable_daily_index(n, date_)
+            if n > 1:
+                yesterday_i = _stable_daily_index(n, date_ - dt.timedelta(days=1))
+                if pick_i == yesterday_i:
+                    pick_i = (pick_i + 1) % n
+            card = dict(cached_quotes[pick_i])
+            if card.get("quote"):
+                card["image_url"] = get_philosopher_image("", card.get("name", ""))
+                return card
+
+        allowed_ids = fetch_allowed_quote_ids()
+        n = len(allowed_ids)
+        if n == 0:
+            return fallback
+        pick_i = _stable_daily_index(n, date_)
+        if n > 1:
+            yesterday_i = _stable_daily_index(n, date_ - dt.timedelta(days=1))
+            if pick_i == yesterday_i:
+                pick_i = (pick_i + 1) % n
+        qid = allowed_ids[pick_i]
+        detail = fetch_quote_detail(str(qid))
+        card = extract_card(detail)
+        ph_id, ph_name = _extract_philosopher_identifiers(detail)
+        card["image_url"] = get_philosopher_image(ph_id, ph_name or card.get("name", ""))
+        if not card["quote"]:
+            return fallback
+        return card
+    except Exception:
+        return fallback
 
 # Page config + global styles
 st.set_page_config(page_title="Sleep Compass", layout="wide")
@@ -154,6 +425,14 @@ div[data-testid="stMarkdownContainer"] li{
 div[data-testid="stCaptionContainer"] *{
   color: var(--muted) !important;
   opacity: 1 !important;
+}
+
+/* Tight caption for specific charts */
+.tight-caption{
+  margin-top: -6px !important;
+  margin-bottom: -8px !important;
+  color: var(--muted) !important;
+  font-size: 0.88rem !important;
 }
 
 /* =========================
@@ -275,6 +554,50 @@ div[data-testid="stRadio"] [role="radiogroup"]{
 div[data-testid="stRadio"] span{
   color: #ffffff !important;
 }
+
+/* =========================
+   Slider input (Streamlit) — yellow accent + boxed like other filters
+   ========================= */
+div[data-testid="stSlider"] label{
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  font-size: 0.9rem !important;
+  text-transform: uppercase !important;
+  opacity: 1 !important;
+}
+
+div[data-testid="stSlider"]{
+  background: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.28) !important;
+  border-radius: 12px !important;
+  padding: 6px 10px 8px 10px !important;
+}
+
+div[data-testid="stSlider"] [data-baseweb="slider"]{
+  padding-top: 4px !important;
+}
+
+div[data-testid="stSlider"] [data-baseweb="slider"] [data-testid="stTickBar"]{
+  background: rgba(255,255,255,0.18) !important;
+}
+
+div[data-testid="stSlider"] [data-baseweb="slider"] [data-testid="stTickBar"] *{
+  color: rgba(255,255,255,0.65) !important;
+  opacity: 1 !important;
+}
+
+/* Ensure min/max edge labels are visible */
+div[data-testid="stSlider"] [data-baseweb="slider"]{
+  color: rgba(255,255,255,0.65) !important;
+}
+div[data-testid="stSlider"] [data-baseweb="slider"] span,
+div[data-testid="stSlider"] [data-baseweb="slider"] div{
+  color: rgba(255,255,255,0.65) !important;
+}
+div[data-testid="stSlider"] [data-baseweb="slider"] [data-testid="stThumbValue"]{
+  color: #ff4d3a !important;
+}
+
 
 /* Plot backgrounds transparent */
 div[data-testid="stPlotlyChart"] > div{ background: transparent !important; }
@@ -513,7 +836,7 @@ div[data-testid="stVerticalBlock"]:has(.section-marker) > div{
   background: transparent !important;
 }
 
-/* ===== Header logo inside the top box ===== */
+/* ===== Header quote block inside the top box ===== */
 .header-marker { display: none !important; }
 
 div[data-testid="stVerticalBlock"]:has(.header-marker){
@@ -525,32 +848,56 @@ div[data-testid="stVerticalBlock"]:has(.header-marker){
   padding-top: 6px !important;   /* bring title closer to top border */
 }
 
-div[data-testid="stVerticalBlock"]:has(.header-marker) .sleep-logo-wrap{
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-wrap{
   position: absolute !important;
-  top: 0px !important;     /* push down */
+  top: 8px !important;
   right: 18px !important;
-
-  width: 175px !important;
-  height: 175px !important;
-  border-radius: 50% !important;
-  overflow: hidden !important;
-
-  background: rgba(255,255,255,0.03) !important; /* optional subtle */
-  box-shadow: 0 10px 18px rgba(0,0,0,0.35) !important;
+  width: 520px !important;
+  display: flex !important;
+  gap: 16px !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
 }
 
-div[data-testid="stVerticalBlock"]:has(.header-marker) img.sleep-logo{
-  position: absolute !important;
-  left: 50% !important;
-  top: 50% !important;
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-img{
+  width: 128px !important;
+  height: 128px !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
+  background: rgba(255,255,255,0.04) !important;
+  flex: 0 0 auto !important;
+}
 
-  width: 170px !important;     /* make the image bigger than circle */
-  height: auto !important;
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-img img{
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
 
-  transform: translate(-50%, -50%) scale(1.05) !important; /* center + fit */
-  transform-origin: center !important;
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-text{
+  max-width: 360px !important;
+  text-align: right !important;
+}
 
-  display: block !important;
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-name{
+  font-weight: 850 !important;
+  color: rgba(255,255,255,0.92) !important;
+  font-size: 1.2rem !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-date{
+  color: rgba(255,255,255,0.62) !important;
+  font-size: 0.9rem !important;
+  margin-top: 4px !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-quote{
+  color: rgba(255,255,255,0.78) !important;
+  font-size: 1.05rem !important;
+  line-height: 1.45 !important;
+  margin-top: 8px !important;
+  white-space: normal !important;
 }
 
 
@@ -563,26 +910,11 @@ div[data-testid="stVerticalBlock"]:has(.header-marker) img.sleep-logo{
     unsafe_allow_html=True,
 )
 
-LOGO_PATH = "images/logo.png"
-logo_b64 = img_to_base64(LOGO_PATH)
-# ===== Top header box (title + date input + overview/reco + logo) =====
-with st.container():
-    # marker so CSS knows "this is the header block"
-    st.markdown('<span class="header-marker"></span>', unsafe_allow_html=True)
-
-    # the logo (top-right inside this container)
-    st.markdown(
-    f"""
-    <div class="sleep-logo-wrap">
-      <img class="sleep-logo" src="data:image/png;base64,{logo_b64}" />
-    </div>
-    """,
-    unsafe_allow_html=True
-    )
+header_slot = st.empty()
 
 # Header
-st.title("Sleep Compass")
-st.caption("Turn sleep logs into smarter nights - track your rhythm and habits that matter.")
+st.title("Rise and Shine")
+#st.caption("How habits, timing, and discipline shape recovery and performance")
 
 
 
@@ -612,6 +944,39 @@ with c2:
         ["All", "Weekdays", "Weekends"],
         horizontal=True,
     )
+
+# ===== Top header box (title + date input + overview/reco + quote) =====
+with header_slot.container():
+    # marker so CSS knows "this is the header block"
+    st.markdown('<span class="header-marker"></span>', unsafe_allow_html=True)
+
+    card = get_daily_quote_card(as_of_date)
+    safe_name = html.escape(card["name"])
+    safe_quote = html.escape(card["quote"])
+    safe_date = html.escape(card.get("quote_date", ""))
+    img_html = ""
+    if card["image_url"]:
+        img_html = f'<div class="motivation-img"><img src="{card["image_url"]}" /></div>'
+    else:
+        initials = "".join([p[0] for p in safe_name.split()[:2]]).upper()
+        img_html = (
+            '<div class="motivation-img" '
+            'style="display:flex;align-items:center;justify-content:center;'
+            'color:rgba(255,255,255,0.75);font-weight:800;">'
+            f"{initials}</div>"
+        )
+
+    date_label = safe_date
+    date_html = f'<div class="motivation-date">{date_label}</div>' if date_label else ""
+    header_html = (
+        f'<div class="motivation-wrap">{img_html}'
+        f'<div class="motivation-text">'
+        f'<div class="motivation-name">{safe_name}</div>'
+        f'{date_html}'
+        f'<div class="motivation-quote">&ldquo;{safe_quote}&rdquo;</div>'
+        f"</div></div>"
+    )
+    st.markdown(header_html, unsafe_allow_html=True)
 
 # Use end-of-day timestamp so the whole selected day is included
 as_of_ts = pd.Timestamp(as_of_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
@@ -644,7 +1009,6 @@ if "is_night_sleep" in df_night_all.columns:
     df_night_all = df_night_all[df_night_all["is_night_sleep"] == True]
 
 # Rolling windows ending at as_of
-df_7_all   = window_by_days(df_all,   as_of_ts, 7)    # includes naps
 df_30_night = window_by_days(df_night, as_of_ts, 30)  # night only
 df_90_night = window_by_days(df_night, as_of_ts, 90)  # night only
 
@@ -763,8 +1127,6 @@ def card_open(title: str, subtitle: str = ""):
 def card_close():
     render_html("</div></div>")
 
-from contextlib import contextmanager
-
 @contextmanager
 def chart_card(title: str, subtitle: str = ""):
     box = st.container()  # NOT border=True
@@ -862,7 +1224,22 @@ with right:
 
 st.markdown("<div style='height: 10px'></div>", unsafe_allow_html=True)
 
-with section_card("Short-term"):
+with st.container():
+    st.markdown('<span class="section-marker"></span>', unsafe_allow_html=True)
+    short_term_header_left, short_term_header_right = st.columns([3, 1], gap="large")
+    with short_term_header_left:
+        st.markdown("## Short-term")
+    with short_term_header_right:
+        short_term_days = st.slider(
+            "SHORT-TERM DAYS",
+            min_value=1,
+            max_value=30,
+            value=7,
+        )
+
+    df_short_all = window_by_days(df_all, as_of_ts, short_term_days)
+    df_short_night = window_by_days(df_night, as_of_ts, short_term_days)
+
     row1_left, row1_right = st.columns(2, gap="large")
     row2_left, row2_right = st.columns(2, gap="large")
 
@@ -875,46 +1252,77 @@ with section_card("Short-term"):
 
     with row1_right:
         #with chart_card("Sleep timeline (7 days)", "Nights + naps in context"):
-        st.markdown("#### Sleep timeline (7 days)")
-        st.caption("Nights + naps in context")
-        st.altair_chart(sleep_bar_last_7_days(df_7_all), use_container_width=True, theme=None)
+        st.markdown(f"#### Sleep timeline ")
+        st.caption(f"Nights + naps in context ({short_term_days} days)")
+        st.altair_chart(
+            sleep_bar_last_n_days(df_short_all, n_days=short_term_days),
+            use_container_width=True,
+            theme=None,
+        )
 
     with row2_left:
         #with chart_card("Total sleep vs target", "Progress toward 7.5h each night"):
         st.markdown("#### Total sleep vs target")
-        st.caption("Progress toward 7.5h each night")
-        st.altair_chart(sleep_target_band(df_night, target_hours=7.5), use_container_width=True)
+        st.caption("Progress toward 7.5h target each night")
+        st.altair_chart(
+            sleep_target_band(df_short_night, target_hours=7.5, n_days=short_term_days),
+            use_container_width=True,
+        )
 
     with row2_right:
         #with chart_card("Sleep composition & quality", "Stage balance and sleep score (last 4 nights)"):
         st.markdown("#### Sleep composition & quality")
-        st.caption("Stage balance and sleep score (last 4 nights)")
-        fig = apply_plotly_dark(plotly_parallel_coords(df_night, n_nights=4))
+        st.markdown(
+            f'<div class="tight-caption">Stage balance and sleep score using parallel coordinates '
+            f'(last {short_term_days} nights)</div>',
+            unsafe_allow_html=True,
+        )
+        fig = apply_plotly_dark(plotly_parallel_coords(df_short_night, n_nights=short_term_days))
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 # ---------------------------
 # Mid-term section (FULL)
 # ---------------------------
-with section_card("Mid-term"):
+with st.container():
+    st.markdown('<span class="section-marker"></span>', unsafe_allow_html=True)
+    mid_term_header_left, mid_term_header_right = st.columns([3, 1], gap="large")
+    with mid_term_header_left:
+        st.markdown("## Mid-term")
+    with mid_term_header_right:
+        mid_term_days = st.slider(
+            "MID-TERM DAYS",
+            min_value=30,
+            max_value=90,
+            value=30,
+        )
+
+    df_mid_night = window_by_days(df_night, as_of_ts, mid_term_days)
+    calendar_anchor = df_mid_night["date"].max() if len(df_mid_night) > 0 else None
+
     m1_left, m1_right = st.columns(2, gap="large")
     m2_left, m2_right = st.columns(2, gap="large")
 
     with m1_left:
         with st.container(border=True):
             st.markdown("#### Calendar heatmap")
-            st.caption("Daily total sleep across the month")
+            st.caption("Daily total sleep across months")
             st.altair_chart(
-                calendar_heatmap_month(df_30_night, value_col="minutes_asleep"),
+                calendar_heatmap_month(
+                    df_night,
+                    value_col="minutes_asleep",
+                    anchor_date=calendar_anchor,
+                    n_days=mid_term_days,
+                ),
                 use_container_width=True
             )
 
     with m1_right:
         with st.container(border=True):
-            st.markdown("#### Sleep rhythm (30 days)")
-            st.caption("Bedtime and wake-up consistency + medians")
+            st.markdown(f"#### Sleep rhythm ")
+            st.caption(f"Bedtime and wake-up consistency + medians ({mid_term_days} days)")
             st.altair_chart(
-                sleep_rhythm_last_30_days(df_30_night),
+                sleep_rhythm_last_30_days(df_mid_night, n_days=mid_term_days),
                 use_container_width=True
             )
 
@@ -923,67 +1331,80 @@ with section_card("Mid-term"):
             st.markdown("#### Bedtime vs sleep efficiency")
             st.caption("How timing relates to quality")
             st.altair_chart(
-                start_time_vs_efficiency(df_30_night),
+                start_time_vs_efficiency(df_mid_night, n_days=mid_term_days),
                 use_container_width=True
             )
 
     with m2_right:
         with st.container(border=True):
-            st.markdown("#### Deep sleep % vs bedtime")
+            st.markdown("#### Bedtime vs deep sleep %")
             st.caption("Timing vs recovery signal")
             st.altair_chart(
-                deep_pct_vs_bedtime(df_30_night),
+                deep_pct_vs_bedtime(df_mid_night, n_days=mid_term_days),
                 use_container_width=True
             )
 
 # ---------------------------
 # Long-term sections (FULL: Health + Bad sleep)
 # ---------------------------
-with section_card("Health & Patterns"):
-  left, right = st.columns(2, gap="large")
+with st.container():
+    st.markdown('<span class="section-marker"></span>', unsafe_allow_html=True)
+    health_header_left, health_header_right = st.columns([3, 1], gap="large")
+    with health_header_left:
+        st.markdown("## Health & Patterns")
+    with health_header_right:
+        health_days = st.slider(
+            "HEALTH & PATTERNS DAYS",
+            min_value=90,
+            max_value=365,
+            value=180,
+        )
 
-  with left:
-      #with section_card("Health"):
-          with st.container(border=True):
-              st.markdown("#### Resting heart rate (weekly)")
-              st.caption("3-month trend (weekly averages)")
-              st.altair_chart(
-                  rhr_over_time_weekly(df_90_night, months=3),
-                  use_container_width=True
-              )
+    df_health_night = window_by_days(df_night, as_of_ts, health_days)
+    health_months = max(1, int(math.ceil(health_days / 30)))
 
-          with st.container(border=True):
-              st.markdown("#### RHR vs sleep score")
-              st.caption("90-day relationship")
-              st.altair_chart(
-                  rhr_vs_score(df_90_night, n_days=90),
-                  use_container_width=True
-              )
+    left, right = st.columns(2, gap="large")
 
-  with right:
-      #with section_card("Bad sleep"):
-          with st.container(border=True):
-              st.markdown("#### Bad sleep signals (Pareto)")
-              st.caption("Triggered signals when score ≤ 75 (last 90 days)")
-              st.altair_chart(
-                  bad_sleep_pareto(df_90_night, n_days=90, score_max=75.0),
-                  use_container_width=True
-              )
+    with left:
+        with st.container(border=True):
+            st.markdown("#### Resting heart rate evolution")
+            st.caption(f"{health_months}-month trend (weekly averages)")
+            st.altair_chart(
+                rhr_over_time_weekly(df_health_night, months=health_months),
+                use_container_width=True
+            )
 
-              with st.expander("How to read this"):
-                  st.markdown(
-                      """
-                      This **Pareto chart** shows how often *different bad sleep signals* were triggered
-                      across nights with a sleep score ≤ 75.
+        with st.container(border=True):
+            st.markdown("#### Resting heart rate vs sleep score")
+            st.caption(f"{health_days}-day relationship")
+            st.altair_chart(
+                rhr_vs_score(df_health_night, n_days=health_days),
+                use_container_width=True
+            )
 
-                      Each bar counts **triggered signals**, not nights.
-                      A single night can contribute to multiple bars
-                      (e.g. short sleep *and* late bedtime).
+    with right:
+        with st.container(border=True):
+            st.markdown("#### Bad sleep signals - Pareto")
+            st.caption(f"Triggered signals when score <= 75 (last {health_days} days)")
+            st.altair_chart(
+                bad_sleep_pareto(df_health_night, n_days=health_days, score_max=75.0),
+                use_container_width=True
+            )
 
-                      The cumulative line answers:
-                      *“Which factors account for most of the problems when sleep is bad?”*
+            with st.expander("How to read this"):
+                st.markdown(
+                    """
+                    This **Pareto chart** shows how often *different bad sleep signals* were triggered
+                    across nights with a sleep score equal or less than 75.
 
-                      This helps prioritize behaviors to fix first,
-                      rather than explaining 100% of bad nights.
-                      """
-                  )
+                    Each bar counts **triggered signals**, not nights.
+                    A single night can contribute to multiple bars
+                    (e.g. short sleep *and* late bedtime).
+
+                    The cumulative line answers:
+                    *Which factors account for most of the problems when sleep is bad?*
+
+                    This helps prioritize behaviors to fix first,
+                    rather than explaining 100% of bad nights.
+                    """
+                )
