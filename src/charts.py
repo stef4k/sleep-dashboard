@@ -382,6 +382,7 @@ def sleep_target_band(df: pd.DataFrame, target_hours: float = 7.5, n_days: int =
             x=alt.X("date_str:N", sort=order, title=None),
             y=alt.Y("lower:Q", title="Total sleep (hours)", scale=alt.Scale(domain=[0, y_max])),
             y2="upper:Q",
+            tooltip=[],
         )
     )
 
@@ -491,97 +492,124 @@ def plotly_parallel_coords(df: pd.DataFrame, n_nights: int = 4):
 
     # --- Discrete line colors (muted, dark-theme friendly)
     discrete_colors = [
-    "rgb(202,148,253)",
-    "rgb(231,131,97)",
-    "rgb(33,240,182)",
-    "rgb(206,240,106)",
+        "rgb(202,148,253)",
+        "rgb(231,131,97)",
+        "rgb(33,240,182)",
+        "rgb(206,240,106)",
+        "rgb(255,196,84)",
+        "rgb(240,96,255)",
+        "rgb(255,108,72)",
+        "rgb(120,255,208)",
     ]
 
-    # Integer id per polyline
-    agg["line_id"] = np.arange(n, dtype=int)
+    palette = (
+        discrete_colors[:n]
+        if n <= len(discrete_colors)
+        else [discrete_colors[i % len(discrete_colors)] for i in range(n)]
+    )
 
-    # Build a stepped colorscale so each integer maps to one solid color.
-    # IMPORTANT: Parcoords expects a continuous scale; this makes it *look* discrete.
+    # Use normalized values so each line maps to exactly one color band.
     if n == 1:
-        colorscale = [[0.0, discrete_colors[0]], [1.0, discrete_colors[0]]]
-        cmin, cmax = 0, 1
+        line_vals = [0.5]
+        colorscale = [[0.0, palette[0]], [1.0, palette[0]]]
     else:
+        line_vals = np.linspace(0.0, 1.0, n).tolist()
+        edges = [0.0] + [(line_vals[i] + line_vals[i + 1]) / 2 for i in range(n - 1)] + [1.0]
         colorscale = []
-        for i in range(n):
-            c = discrete_colors[i % len(discrete_colors)]
-            a0 = i / (n - 1)
-            a1 = (i + 1) / (n - 1)
-            # Duplicate stops => hard step (no gradient)
-            colorscale.append([a0, c])
-            colorscale.append([min(1.0, a1 - 1e-6), c])
-        cmin, cmax = 0, n - 1
+        for i, color in enumerate(palette):
+            left = edges[i]
+            right = edges[i + 1] if i == n - 1 else max(edges[i + 1] - 1e-6, left)
+            colorscale.append([left, color])
+            colorscale.append([right, color])
+
+    domain_x0, domain_x1 = 0.05, 1.0
+    domain_y0, domain_y1 = 0.07, 0.998
+
+    dimensions = [
+        dict(
+            label="Date",
+            values=agg["date_ord"],
+            range=date_rng,
+            tickvals=date_tv,
+            ticktext=date_tt,
+        ),
+        dict(
+            label="Awake (min)",
+            values=agg["awake"],
+            range=awake_rng,
+            tickvals=awake_tv,
+            ticktext=awake_tt,
+        ),
+        dict(
+            label="Light (min)",
+            values=agg["light"],
+            range=light_rng,
+            tickvals=light_tv,
+            ticktext=light_tt,
+        ),
+        dict(
+            label="REM (min)",
+            values=agg["rem"],
+            range=rem_rng,
+            tickvals=rem_tv,
+            ticktext=rem_tt,
+        ),
+        dict(
+            label="Deep (min)",
+            values=agg["deep"],
+            range=deep_rng,
+            tickvals=deep_tv,
+            ticktext=deep_tt,
+        ),
+        dict(
+            label="Score (/100)",
+            values=agg["score"],
+            range=[50, 100],
+            tickvals=[50, 60, 70, 80, 90, 100],
+            ticktext=["50", "60", "70", "80", "90", "100"],
+        ),
+    ]
 
     fig = go.Figure(
         go.Parcoords(
             # Add headroom so top labels don't clip
-            domain=dict(x=[0.06, 1.0], y=[0.02, 0.90]),
+            domain=dict(x=[domain_x0, domain_x1], y=[domain_y0, domain_y1]),
             line=dict(
-                color=agg["line_id"],
+                color=line_vals,
                 colorscale=colorscale,
-                cmin=cmin,
-                cmax=cmax,
+                cmin=0,
+                cmax=1,
                 showscale=False,  # remove the palette on the right
             ),
-            dimensions=[
-                dict(
-                    label="Date",
-                    values=agg["date_ord"],
-                    range=date_rng,
-                    tickvals=date_tv,
-                    ticktext=date_tt,
-                ),
-                dict(
-                    label="Awake (min)",
-                    values=agg["awake"],
-                    range=awake_rng,
-                    tickvals=awake_tv,
-                    ticktext=awake_tt,
-                ),
-                dict(
-                    label="Light (min)",
-                    values=agg["light"],
-                    range=light_rng,
-                    tickvals=light_tv,
-                    ticktext=light_tt,
-                ),
-                dict(
-                    label="REM (min)",
-                    values=agg["rem"],
-                    range=rem_rng,
-                    tickvals=rem_tv,
-                    ticktext=rem_tt,
-                ),
-                dict(
-                    label="Deep (min)",
-                    values=agg["deep"],
-                    range=deep_rng,
-                    tickvals=deep_tv,
-                    ticktext=deep_tt,
-                ),
-                dict(
-                    label="Score (/100)",
-                    values=agg["score"],
-                    range=[50, 100],
-                    tickvals=[50, 60, 70, 80, 90, 100],
-                    ticktext=["50", "60", "70", "80", "90", "100"],
-                ),
-            ],
-            labelfont=dict(size=14, color="rgba(255,255,255,0.88)"),
-            tickfont=dict(size=12, color="rgba(255,255,255,0.75)"),
-            rangefont=dict(size=12, color="rgba(255,255,255,0.75)"),
+            dimensions=dimensions,
+            labelfont=dict(size=17, color="rgba(255,255,255,1)"),
+            tickfont=dict(size=12, color="rgba(255,255,255,1)"),
+            rangefont=dict(size=12, color="rgba(255,255,255,1)"),
         )
     )
 
+    # Parcoords does not expose axis line colors, so draw white axis lines on top.
+    axis_positions = np.linspace(domain_x0, domain_x1, len(dimensions)).tolist()
+    axis_shapes = [
+        dict(
+            type="line",
+            xref="paper",
+            yref="paper",
+            x0=x,
+            x1=x,
+            y0=domain_y0,
+            y1=domain_y1,
+            line=dict(color="rgba(255,255,255,0.9)", width=1),
+        )
+        for x in axis_positions
+    ]
+
     fig.update_layout(
-        height=CHART_HEIGHT,
-        margin=dict(l=95, r=25, t=45, b=30),
+        height=CHART_HEIGHT + 42,
+        margin=dict(l=95, r=25, t=0, b=20),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
+        shapes=axis_shapes,
     )
     return fig
 
@@ -1095,12 +1123,12 @@ def rhr_over_time_weekly(df: pd.DataFrame, months: int = 3):
 
     return (line + pts).properties(
         height=CHART_HEIGHT,
-        title=alt.TitleParams(
-            text=f"Resting heart rate (weekly avg, last {months} months)",
-            anchor="start",
-            fontSize=14,
-            dy=0,
-        ),
+        #title=alt.TitleParams(
+            #text=f"Resting heart rate (weekly avg, last {months} months)",
+            #anchor="start",
+            #fontSize=14,
+            #dy=0,
+        #),
         padding={"left": 10, "right": 10, "top": 35, "bottom": 45},  # <- THIS fixes clipping
     ).configure_view(strokeWidth=0)
 
@@ -1150,7 +1178,7 @@ def rhr_vs_score(df: pd.DataFrame, n_days: int = 90):
 
     return (pts + trend).properties(
         height=CHART_HEIGHT,
-        title=f"Resting heart rate (RHR) vs sleep score (last {n_days} days)",
+        #title=f"Resting heart rate (RHR) vs sleep score (last {n_days} days)",
         padding={"bottom": 40, "left": 10, "right": 10, "top": 35},
     ).configure_view(strokeWidth=0)
 
@@ -1275,10 +1303,10 @@ def bad_sleep_pareto(df: pd.DataFrame, n_days: int = 30, score_max: float = 75.0
 
     return alt.layer(bars, line).resolve_scale(y="independent").properties(
         height=CHART_HEIGHT,
-        title=alt.TitleParams(
-            text=f"Bad sleep signals (Pareto of triggered signals, score ≤ {score_max}, last {n_days} days)",
-            anchor="start",
-            fontSize=14,
-        ),
+        #title=alt.TitleParams(
+            #text=f"Bad sleep signals (Pareto of triggered signals, score ≤ {score_max}, last {n_days} days)",
+            #anchor="start",
+            #fontSize=14,
+        #),
         padding={"top": 35, "bottom": 70, "left": 10, "right": 55},
     ).configure_view(strokeWidth=0)

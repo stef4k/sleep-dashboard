@@ -427,6 +427,14 @@ div[data-testid="stCaptionContainer"] *{
   opacity: 1 !important;
 }
 
+/* Tight caption for specific charts */
+.tight-caption{
+  margin-top: -6px !important;
+  margin-bottom: -8px !important;
+  color: var(--muted) !important;
+  font-size: 0.88rem !important;
+}
+
 /* =========================
    ONE CARD STYLE (used everywhere)
    ========================= */
@@ -1244,8 +1252,8 @@ with st.container():
 
     with row1_right:
         #with chart_card("Sleep timeline (7 days)", "Nights + naps in context"):
-        st.markdown(f"#### Sleep timeline ({short_term_days} days)")
-        st.caption("Nights + naps in context")
+        st.markdown(f"#### Sleep timeline ")
+        st.caption(f"Nights + naps in context ({short_term_days} days)")
         st.altair_chart(
             sleep_bar_last_n_days(df_short_all, n_days=short_term_days),
             use_container_width=True,
@@ -1255,7 +1263,7 @@ with st.container():
     with row2_left:
         #with chart_card("Total sleep vs target", "Progress toward 7.5h each night"):
         st.markdown("#### Total sleep vs target")
-        st.caption("Progress toward 7.5h each night")
+        st.caption("Progress toward 7.5h target each night")
         st.altair_chart(
             sleep_target_band(df_short_night, target_hours=7.5, n_days=short_term_days),
             use_container_width=True,
@@ -1264,7 +1272,11 @@ with st.container():
     with row2_right:
         #with chart_card("Sleep composition & quality", "Stage balance and sleep score (last 4 nights)"):
         st.markdown("#### Sleep composition & quality")
-        st.caption(f"Stage balance and sleep score using parallel coordinates (last {short_term_days} nights)")
+        st.markdown(
+            f'<div class="tight-caption">Stage balance and sleep score using parallel coordinates '
+            f'(last {short_term_days} nights)</div>',
+            unsafe_allow_html=True,
+        )
         fig = apply_plotly_dark(plotly_parallel_coords(df_short_night, n_nights=short_term_days))
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
@@ -1294,7 +1306,7 @@ with st.container():
     with m1_left:
         with st.container(border=True):
             st.markdown("#### Calendar heatmap")
-            st.caption("Daily total sleep across the months")
+            st.caption("Daily total sleep across months")
             st.altair_chart(
                 calendar_heatmap_month(
                     df_night,
@@ -1307,8 +1319,8 @@ with st.container():
 
     with m1_right:
         with st.container(border=True):
-            st.markdown(f"#### Sleep rhythm ({mid_term_days} days)")
-            st.caption("Bedtime and wake-up consistency + medians")
+            st.markdown(f"#### Sleep rhythm ")
+            st.caption(f"Bedtime and wake-up consistency + medians ({mid_term_days} days)")
             st.altair_chart(
                 sleep_rhythm_last_30_days(df_mid_night, n_days=mid_term_days),
                 use_container_width=True
@@ -1355,7 +1367,7 @@ with st.container():
 
     with left:
         with st.container(border=True):
-            st.markdown("#### Resting heart rate (weekly)")
+            st.markdown("#### Resting heart rate evolution")
             st.caption(f"{health_months}-month trend (weekly averages)")
             st.altair_chart(
                 rhr_over_time_weekly(df_health_night, months=health_months),
@@ -1363,7 +1375,7 @@ with st.container():
             )
 
         with st.container(border=True):
-            st.markdown("#### RHR vs sleep score")
+            st.markdown("#### Resting heart rate vs sleep score")
             st.caption(f"{health_days}-day relationship")
             st.altair_chart(
                 rhr_vs_score(df_health_night, n_days=health_days),
@@ -1372,8 +1384,8 @@ with st.container():
 
     with right:
         with st.container(border=True):
-            st.markdown("#### Bad sleep signals (Pareto)")
-            st.caption(f"Triggered signals when score ??? 75 (last {health_days} days)")
+            st.markdown("#### Bad sleep signals - Pareto")
+            st.caption(f"Triggered signals when score <= 75 (last {health_days} days)")
             st.altair_chart(
                 bad_sleep_pareto(df_health_night, n_days=health_days, score_max=75.0),
                 use_container_width=True
@@ -1383,14 +1395,14 @@ with st.container():
                 st.markdown(
                     """
                     This **Pareto chart** shows how often *different bad sleep signals* were triggered
-                    across nights with a sleep score ??? 75.
+                    across nights with a sleep score equal or less than 75.
 
                     Each bar counts **triggered signals**, not nights.
                     A single night can contribute to multiple bars
                     (e.g. short sleep *and* late bedtime).
 
                     The cumulative line answers:
-                    *???Which factors account for most of the problems when sleep is bad????*
+                    *Which factors account for most of the problems when sleep is bad?*
 
                     This helps prioritize behaviors to fix first,
                     rather than explaining 100% of bad nights.
