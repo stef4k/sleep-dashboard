@@ -119,6 +119,105 @@ def _get_id(obj: dict):
     return obj.get("id") or obj.get("_id") or obj.get("quoteID") or obj.get("quoteId")
 
 
+def render_explanation():
+    st.title("Design Rationale")
+    st.caption("Why the dashboard looks and behaves the way it does")
+
+    intro = (
+        "This page explains the main design choices behind the dashboard. "
+        "The focus is on making trends easy to scan, comparisons easy to trust, "
+        "and decisions easy to act on."
+    )
+    st.markdown(intro)
+
+    left, right = st.columns(2, gap="large")
+
+    with left:
+        with st.container(border=True):
+            st.markdown("### Data")
+            st.markdown(
+                """
+                - The dashboard uses `data/sleep_data.csv` as the single source of truth.
+                - Each row is a sleep session with timestamps, minutes in stages, efficiency, score, and resting heart rate.
+                - Dates are parsed and invalid rows are dropped to keep comparisons reliable.
+                - Night-only filtering is used where naps would distort long-term patterns.
+                """
+            )
+
+        with st.container(border=True):
+            st.markdown("### Structure")
+            st.markdown(
+                """
+                - The narrative flows from *last night* to *short-term*, *mid-term*, and *long-term*.
+                - Each section keeps a consistent card layout, so you can scan without re-learning the page.
+                - Time-window controls live beside section headers to reinforce context.
+                """
+            )
+
+        with st.container(border=True):
+            st.markdown("### Visual Representations")
+            st.markdown(
+                """
+                - Trapezoid funnel: a compact, visceral view of last-night composition.
+                - Bar + target band: quick day-to-day quantity vs goal.
+                - Parallel coordinates: multi-metric comparison across nights.
+                - Calendar heatmap + rhythm plot: consistency and cadence.
+                - Scatter and line charts: relationships (timing vs quality, RHR vs score) and trends.
+                - Pareto chart: isolates the few signals that drive most bad nights.
+                """
+            )
+
+    with right:
+        with st.container(border=True):
+            st.markdown("### Page Layout")
+            st.markdown(
+                """
+                - A wide layout supports side-by-side comparison without excessive scrolling.
+                - The header block anchors the page with a daily context and motivation.
+                - Cards and captions enforce a rhythm: title, purpose, then chart.
+                """
+            )
+
+        with st.container(border=True):
+            st.markdown("### Screen Space Use")
+            st.markdown(
+                """
+                - Dense charts (parallel coordinates, heatmaps) get full-width containers.
+                - Two-column grids balance breadth with readability for faster scanning.
+                - Margins and spacing are tuned to keep the dark theme breathable.
+                """
+            )
+
+        with st.container(border=True):
+            st.markdown("### Interaction")
+            st.markdown(
+                """
+                - Date input enables time-travel views so insights can be replayed as of any night.
+                - Day-type filter and section sliders make the time horizon explicit.
+                - Chart hovers and expanders provide detail without cluttering the main view.
+                """
+            )
+
+    with st.container(border=True):
+        st.markdown("### Meta Data")
+        st.markdown(
+            """
+            - The *as-of* date is applied globally, so every section reflects the same cutoff.
+            - Derived metadata (week day, night-only flags) is used for consistent filtering.
+            - Quote content is cached daily to avoid noisy refresh behavior.
+            """
+        )
+
+    with st.container(border=True):
+        st.markdown("### Color Use")
+        st.markdown(
+            """
+            - A dark, blue-toned gradient evokes night and reduces glare.
+            - Muted text and gridlines keep focus on the signal, not the chrome.
+            - Chart palettes align with the theme and preserve contrast for legibility.
+            """
+        )
+
 def _norm_url(u: str):
     if not u:
         return ""
@@ -391,6 +490,28 @@ div[data-testid="stMarkdownContainer"] h2,
 div[data-testid="stMarkdownContainer"] h3,
 div[data-testid="stMarkdownContainer"] h4{
   color: var(--text) !important;
+}
+
+/* Sidebar text: keep readable on light background (override global dark text) */
+[data-testid="stSidebar"]{
+  color: #0c1326 !important;
+}
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p,
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] li,
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] h1,
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] h2,
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] h3,
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] h4,
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] h5,
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] h6{
+  color: #0c1326 !important;
+}
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] span{
+  color: #0c1326 !important;
+}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] *{
+  color: rgba(12,19,38,0.65) !important;
 }
 
 /* Title size */
@@ -909,6 +1030,15 @@ div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-quote{
 """,
     unsafe_allow_html=True,
 )
+
+page = st.sidebar.radio(
+    "PAGE",
+    ["Dashboard", "Explanation"],
+    index=0,
+)
+if page == "Explanation":
+    render_explanation()
+    st.stop()
 
 header_slot = st.empty()
 
