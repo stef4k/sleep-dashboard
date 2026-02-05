@@ -285,10 +285,10 @@ def sleep_bar_last_n_days(df: pd.DataFrame, n_days: int = 7):
     seg["start_str"] = seg["x1"].apply(hhmm_from_hour)
     seg["end_str"] = seg["x2"].apply(hhmm_from_hour)
 
-    # Color scheme: Night sleep = blue, Nap = orange
+    # Color scheme: Night sleep = blue, Nap = teal
     color_scale = alt.Scale(
         domain=["Night sleep", "Nap"],
-        range=["#1f77b4", "#ff7f0e"]  # classic, readable, colorblind-friendlier than random picks
+        range=["#1f77b4", "#2DD4BF"]  # keep orange reserved for "awake"/waking semantics elsewhere
     )
 
     bars = (

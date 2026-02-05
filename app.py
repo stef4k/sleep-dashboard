@@ -137,10 +137,13 @@ def render_explanation():
             st.markdown("### Data")
             st.markdown(
                 """
-                - The dashboard uses `data/sleep_data.csv` as the single source of truth.
-                - Each row is a sleep session with timestamps, minutes in stages, efficiency, score, and resting heart rate.
-                - Dates are parsed and invalid rows are dropped to keep comparisons reliable.
-                - Night-only filtering is used where naps would distort long-term patterns.
+                - The dataset contains ~6 months of personal sleep data recorded with a Fitbit Versa 2.
+                - It is tabular with 176 rows and 14 columns; each row is a sleep session.
+                - The date refers to the day the session ended, to avoid ambiguity.
+                - Core attributes include start/end time, duration, minutes asleep/awake, efficiency (0-1), sleep stages (deep, light, REM), overall score (0-100), and resting heart rate.
+                - I built the dataset by merging Fitbit export data with the Fitbit Web API sleep logs,
+                  then keeping relevant fields and converting time columns to minutes.
+                - I parsed the dates and dropped invalid rows to keep comparisons reliable.
                 """
             )
 
@@ -148,22 +151,28 @@ def render_explanation():
             st.markdown("### Structure")
             st.markdown(
                 """
-                - The narrative flows from *last night* to *short-term*, *mid-term*, and *long-term*.
-                - Each section keeps a consistent card layout, so you can scan without re-learning the page.
-                - Time-window controls live beside section headers to reinforce context.
-                """
+                - The narrative flows from checking *last night* overview, to recommendations for today, then *short-term*, *mid-term*, and *long-term* sections. I consider each of those a section of the dashboard. The mentioned flow follows the western human tendency to process information from top right to bottom left.
+                - Each section keeps a consistent card layout, which makes it easy to navigate and always know in which section we are.
+                - I also added time-window filters next to some section headers to reinforce context and easily expand my analysis for a particular time-frame.
+                - I added a daily quote because I am into philosophy (especially Ancient Greek philosophy). It is not directly tied to sleep, but it adds a small moment of motivation and reflection that fits the dashboard’s recovery mindset.
+                 """
             )
 
         with st.container(border=True):
             st.markdown("### Visual Representations")
             st.markdown(
                 """
-                - Trapezoid funnel: a compact, visceral view of last-night composition.
-                - Bar + target band: quick day-to-day quantity vs goal.
-                - Parallel coordinates: multi-metric comparison across nights.
-                - Calendar heatmap + rhythm plot: consistency and cadence.
-                - Scatter and line charts: relationships (timing vs quality, RHR vs score) and trends.
-                - Pareto chart: isolates the few signals that drive most bad nights.
+                - I use a funnel chart (**Efficiency funnel**) to summarize last night in one glance (sleep-stage composition + efficiency). It is an effective way to visualize and understand quickly how the night was structured and the stages of the night sleep.
+                - I use a timeline bar chart (**Sleep timeline**) to compare nights and naps across a short window and spot irregular days quickly. Since I rarely sleep before midnight, I find it more intuitive to have each row start from midnight so that the date of sleep is clear.
+                - I use a linechart (**Total sleep vs target**) and a green zone to show whether I hit my 7.5h goal and how far off I am when I miss it in the short-term.
+                - I use a parallel coordinate plot (**Sleep composition & quality**) to compare the time spent in each sleep stage without switching between separate charts. By drawing a line on any axis, the plot filter and intensifies the lines that matches that value, which makes it easy to query and identify patterns in the short-term, e.g. night where I was awake the most in the last 30 days.
+                - I use a heatmap (**Calendar heatmap**) to show long sequences and month-to-month variation, and to make outliers and gaps obvious. After identifying an outlier night, I can scroll back to the top and use the date input to jump to that night and investigate it in detail.
+                - I use a time-series line chart (**Sleep rhythm**) chart to show bedtime/wake-time consistency and medians because regularity matters as much as duration. This plot also helps identify trends in bedtime/wake-time, and outlier nights.
+                - I use scatter plots (**bedtime vs efficiency, bedtime vs deep % **) to test hypotheses about bedtime, e.g. is going to bed early correlated with more deep sleep?, is going to bed late correlated to better efficiency but at what cost?
+                - I use a linechart (**Resting heart rate evolution**) and scatterplot (**Resting heart rate vs sleep score**) for resting-heart-rate trends/relationships to connect sleep quality with potential health issues and connect stress related periods with elevated heart-rate.
+                - I use a Pareto chart (**Bad sleep signals**) of bad-sleep signals to prioritize the few patterns that explain most low sleep score nights. This helps me to focus and take action on the most impactful factors that lead to bad sleep. Each x-axis category is a simple hypothesis (evaluated on nights with **score ≤ 75**):
+                  - **Fixed thresholds:** Late bedtime (≥ 03:00), Short sleep (< 7h), Low efficiency (< 0.80) and Low deep sleep (deep% < 12%).
+                  - **Percentile-based ("relative") thresholds:** High RHR (≥ 75th percentile of RHR over the selected window) and "Woke up a lot" (minutes awake ≥ 75th percentile over the selected window).
                 """
             )
 
@@ -173,8 +182,10 @@ def render_explanation():
             st.markdown(
                 """
                 - A wide layout supports side-by-side comparison without excessive scrolling.
+                - The idea is that I can quickly scan the top of the dashboard for a check-in (which I do everyday). Then, if I am curious and have some time I can scroll down and dive into the sections of mid-term and long-term visuals. Those sections barely change day-to-day, so it does not make sense to constantly evaluate them. Probably, the optimal time to check them is once per week for the mid-term and once per month for the long-term.
                 - The header block anchors the page with a daily context and motivation.
-                - Cards and captions enforce a rhythm: title, purpose, then chart.
+                - Cards and captions follow logical order: title, purpose, then chart.
+                - The optimal zoom for the browser window is around 80% to balance readability with overview.
                 """
             )
 
@@ -182,9 +193,12 @@ def render_explanation():
             st.markdown("### Screen Space Use")
             st.markdown(
                 """
-                - Dense charts (parallel coordinates, heatmaps) get full-width containers.
-                - Two-column grids balance breadth with readability for faster scanning.
-                - Margins and spacing are tuned to keep the dark theme breathable.
+                - I set the page to a wide layout so I can place charts in two columns and compare them side by side.
+                - I keep the daily controls (dashboard date + weekday/weekend filter) near the top so the context stays obvious.
+                - I reserve the top of the page for the daily check-in (overview + recommendations) because I review it every day.
+                - I organize the short-term and mid-term visuals in 2x2 grids so I can read a whole section faster.
+                - Axis ticks are adapted to the charts avoiding overlapping and easing reading.
+                - I use consistent card padding and spacing so the layout feels structured.
                 """
             )
 
@@ -192,29 +206,42 @@ def render_explanation():
             st.markdown("### Interaction")
             st.markdown(
                 """
-                - Date input enables time-travel views so insights can be replayed as of any night.
-                - Day-type filter and section sliders make the time horizon explicit.
-                - Chart hovers and expanders provide detail without cluttering the main view.
+                - The date input enables time-travel views so insights can be replayed as of any night.
+                - The weekday/weekend filter lets me compare routine days against weekend behavior and see if there are any differences.
+                - Each section has its own time window slider (short-term 1-30 days, mid-term 30-90, long-term 90-365), so I can explore ranges independently as I want.
+                - Most charts have extra hover information which provides detail without cluttering the main view.
                 """
             )
 
-    with st.container(border=True):
-        st.markdown("### Meta Data")
-        st.markdown(
-            """
-            - The *as-of* date is applied globally, so every section reflects the same cutoff.
-            - Derived metadata (week day, night-only flags) is used for consistent filtering.
-            - Quote content is cached daily to avoid noisy refresh behavior.
-            """
-        )
+        with st.container(border=True):
+            st.markdown("### Meta Data")
+            st.markdown(
+                """
+                - I fetched some philosophical quotes from the [philosophers API](https://philosophersapi.com/), filtering only the schools of philosophy that I am interested. I saved those quotes in a separate JSON file for easy access.
+                - I store the quotes locally in `data/philo_quotes_cache.json` so the dashboard still works even if the API is slow or unavailable.
+                - I pick the daily quote deterministically from the selected date so it does not shuffle on refresh, and I cache API requests so the header stays fast.                
+                - The images of the philosophers are fetched on the fly from the API since I found that the image URLs were quite stable and I wanted to avoid caching too many images locally.
+                - I build separate windowed datasets per section (short/mid/long) from the same filtered data so each section stays independent but consistent.
+                """
+            )
 
     with st.container(border=True):
         st.markdown("### Color Use")
         st.markdown(
             """
-            - A dark, blue-toned gradient evokes night and reduces glare.
-            - Muted text and gridlines keep focus on the signal, not the chrome.
-            - Chart palettes align with the theme and preserve contrast for legibility.
+            - I chose a dark, blue-toned gradient background to evoke night.
+            - I define a small set of CSS variables for text, muted text, card backgrounds, and borders, and I reuse them across the page for consistency.
+            - I keep titles and key numbers high-contrast and I push secondary text to muted grays so the hierarchy stays clear.
+            - I use subtle borders and shadows to separate cards without bright outlines.
+            - I keep color meanings stable across charts:
+              - **Orange** highlights *Wake-up* / waking-related markers.
+              - **Purple** highlights *Bedtime* / falling-asleep timing.
+              - **Teal** encodes *Naps* (so it does not compete with waking-up orange).
+              - **Green** encodes “good” sleep in **Total sleep vs target** (target zone) and the **Calendar heatmap** (higher total sleep).
+              - **Red** encodes “bad” sleep in the **Calendar heatmap** (lower total sleep).
+            - For some scatter plots, I encode **sleep score** as color using a continuous **dark blue -> white** palette, so higher score reads as darker.
+            - In the parallel coordinate plot, I use 7 separable colors that are also distinguishable from the dark blue background.
+            - I do not use rainbow palettes to avoid re-learning a new legend in every chart.
             """
         )
 
@@ -1402,11 +1429,7 @@ with st.container():
     with row2_right:
         #with chart_card("Sleep composition & quality", "Stage balance and sleep score (last 4 nights)"):
         st.markdown("#### Sleep composition & quality")
-        st.markdown(
-            f'<div class="tight-caption">Stage balance and sleep score using parallel coordinates '
-            f'(last {short_term_days} nights)</div>',
-            unsafe_allow_html=True,
-        )
+        st.caption(f"Stage balance and sleep score using parallel coordinates last {short_term_days} nights")
         fig = apply_plotly_dark(plotly_parallel_coords(df_short_night, n_nights=short_term_days))
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
