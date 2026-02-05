@@ -914,7 +914,7 @@ header_slot = st.empty()
 
 # Header
 st.title("The Art of Sleeping")
-#st.caption("How habits, timing, and discipline shape recovery and performance")
+st.caption("My nightly scorecard for better recovery and performance")
 
 
 
