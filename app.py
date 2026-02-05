@@ -913,7 +913,7 @@ div[data-testid="stVerticalBlock"]:has(.header-marker) .motivation-quote{
 header_slot = st.empty()
 
 # Header
-st.title("Rise and Shine")
+st.title("The Art of Sleeping")
 #st.caption("How habits, timing, and discipline shape recovery and performance")
 
 
