@@ -1538,7 +1538,19 @@ with st.container():
     with right:
         with st.container(border=True):
             st.markdown("#### Bad sleep signals - Pareto")
-            st.caption(f"Triggered signals when score <= 75 (last {health_days} days)")
+            pareto_daily = df_health_night.copy()
+            pareto_daily["date"] = pd.to_datetime(pareto_daily["date"], errors="coerce")
+            pareto_daily = pareto_daily.dropna(subset=["date", "overall_score"])
+            pareto_daily = (
+                pareto_daily.assign(day=pareto_daily["date"].dt.floor("D"))
+                .groupby("day", as_index=False)
+                .agg(score=("overall_score", "mean"))
+            )
+            total_nights = int(len(pareto_daily))
+            bad_nights = int((pareto_daily["score"] <= 75.0).sum()) if total_nights else 0
+            st.caption(
+                f"Triggered signals when score ≤ 75. In detail, {bad_nights} bad nights out of the {total_nights} recorded nights in the last {health_days} days"
+            )
             st.altair_chart(
                 bad_sleep_pareto(df_health_night, n_days=health_days, score_max=75.0),
                 use_container_width=True
